@@ -1,37 +1,36 @@
-﻿{
-    "name":  "hutao-desktop-pet",
-    "version":  "0.4.0",
-    "private":  true,
-    "description":  "A 2D Hu Tao desktop pet built with Electron, now with a Bilibili wandering companion.",
-    "type":  "module",
-    "main":  "./out/main/index.cjs",
-    "scripts":  {
-                    "dev":  "node scripts/run-electron-vite.cjs dev",
-                    "build":  "npm run typecheck \u0026\u0026 node scripts/run-electron-vite.cjs build",
-                    "dist":  "node scripts/build-exe.cjs",
-                    "preview":  "node scripts/run-electron-vite.cjs preview",
-                    "typecheck":  "tsc --noEmit -p tsconfig.node.json \u0026\u0026 tsc --noEmit -p tsconfig.web.json",
-                    "test":  "node scripts/run-tests.mjs",
-                    "smoke":  "node scripts/run-smoke.cjs"
-                },
-    "keywords":  [
-                     "electron",
-                     "desktop-pet",
-                     "hutao",
-                     "bilibili"
-                 ],
-    "author":  "HuTao Desktop Pet",
-    "license":  "MIT",
-    "devDependencies":  {
-                            "@types/node":  "latest",
-                            "electron":  "latest",
-                            "electron-builder":  "^26.8.1",
-                            "electron-vite":  "latest",
-                            "typescript":  "latest",
-                            "vite":  "latest"
-                        },
-    "dependencies":  {
-                         "active-win":  "^8.2.1"
-                     }
+{
+  "name": "hutao-desktop-pet",
+  "version": "0.4.0",
+  "private": true,
+  "description": "A 2D Hu Tao desktop pet built with Electron, now with a Bilibili wandering companion.",
+  "type": "module",
+  "main": "./out/main/index.cjs",
+  "scripts": {
+    "dev": "node scripts/run-electron-vite.cjs dev",
+    "build": "npm run typecheck && node scripts/run-electron-vite.cjs build",
+    "dist": "node scripts/build-exe.cjs",
+    "preview": "node scripts/run-electron-vite.cjs preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "node scripts/run-tests.mjs",
+    "smoke": "node scripts/run-smoke.cjs"
+  },
+  "keywords": [
+    "electron",
+    "desktop-pet",
+    "hutao",
+    "bilibili"
+  ],
+  "author": "HuTao Desktop Pet",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "latest",
+    "electron": "latest",
+    "electron-builder": "^26.8.1",
+    "electron-vite": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "dependencies": {
+    "active-win": "^8.2.1"
+  }
 }
-
