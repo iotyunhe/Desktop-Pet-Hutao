@@ -1,0 +1,36 @@
+node_modules/
+dist/
+dist-electron/
+out/
+release/
+.vite/
+.cache/
+tmp/
+.tmp/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local configuration and OS files
+.env
+*.local
+.DS_Store
+Thumbs.db
+
+# Local caches and generated artifacts
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+instance/
+*.sqlite
+*.sqlite3
+reports/
+exports/
+logs/

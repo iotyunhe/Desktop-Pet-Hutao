@@ -1,0 +1,48 @@
+name: Bug report
+description: 报告一个可复现的问题
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请先确认使用的是最新版本，并且没有在公开 Issue 里粘贴 API Key、Cookie 或用户存档。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 描述实际现象和期望行为。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开桌宠
+        2. 长按胡桃 1 秒
+        3. 看到……
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: 设置/关于或 release 文件名里的版本号
+      placeholder: 0.4.0
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: 系统
+      placeholder: Windows 11 23H2 / 笔记本 125% 缩放
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或截图
+      description: 可附 `userData/logs/app.log` 的相关片段（请先删除隐私信息）。
+    validations:
+      required: false

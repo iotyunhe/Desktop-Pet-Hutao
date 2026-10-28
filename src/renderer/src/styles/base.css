@@ -1,0 +1,24 @@
+:root {
+  color-scheme: light;
+  font-family:
+    "Microsoft YaHei",
+    "Segoe UI",
+    system-ui,
+    sans-serif;
+  background: transparent;
+  --ink: #33201a;
+  --warm-red: #a7332c;
+  --paper: rgba(255, 244, 226, 0.96);
+  --paper-strong: rgba(255, 249, 239, 0.9);
+  --line: rgba(126, 54, 40, 0.22);
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}

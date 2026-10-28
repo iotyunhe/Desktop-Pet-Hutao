@@ -1,0 +1,369 @@
+.side-panel {
+  position: absolute;
+  top: 10px;
+  left: 8px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  width: var(--panel-width);
+  max-height: calc(100vh - 18px);
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(126, 54, 40, 0.26);
+  border-radius: 10px;
+  color: var(--ink);
+  background: rgba(255, 244, 226, 0.97);
+  box-shadow: 0 10px 24px rgba(74, 34, 24, 0.2);
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+body[data-panel-side="right"] .side-panel {
+  right: 8px;
+  left: auto;
+}
+
+.side-panel[hidden] {
+  display: none;
+}
+
+.side-panel button,
+.side-panel input,
+.side-panel textarea {
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--ink);
+}
+
+.side-panel button {
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 5px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper-strong);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.side-panel button:hover {
+  background: rgba(255, 232, 205, 0.96);
+}
+
+.side-panel button:disabled {
+  cursor: default;
+  opacity: 0.44;
+}
+
+.panel-tabs {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 7px 7px 6px;
+  border-bottom: 1px solid rgba(126, 54, 40, 0.14);
+  background: rgba(255, 248, 236, 0.72);
+}
+
+.side-panel .panel-tab {
+  position: relative;
+  min-height: 26px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: rgba(51, 32, 26, 0.62);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.side-panel .panel-tab:hover {
+  background: rgba(255, 232, 205, 0.7);
+}
+
+.side-panel .panel-tab.is-active {
+  color: #fff;
+  background: linear-gradient(90deg, #d84a3c, #f0874b);
+  box-shadow: 0 3px 8px rgba(216, 74, 60, 0.25);
+}
+
+.panel-tab-dot {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #ffd27a;
+}
+
+.panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px 9px 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.panel-body.is-share {
+  padding: 9px;
+}
+
+.panel-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.panel-section-head strong {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.panel-section-sub {
+  margin: 0 0 7px;
+  color: rgba(51, 32, 26, 0.66);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.side-panel .panel-link-button {
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 9.5px;
+}
+
+.panel-hint {
+  margin: 9px 0 0;
+  color: rgba(51, 32, 26, 0.56);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.bilibili-section,
+.ai-section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.care-panel {
+  display: block;
+}
+
+.care-header,
+.care-stats,
+.care-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.care-header,
+.care-stats {
+  justify-content: space-between;
+}
+
+.care-header {
+  font-weight: 800;
+}
+
+.care-meter {
+  height: 6px;
+  margin: 7px 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(126, 54, 40, 0.16);
+}
+
+.care-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d84a3c, #f4b451);
+}
+
+.care-actions,
+.care-chip-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.care-actions {
+  margin-top: 8px;
+}
+
+.care-section {
+  margin-top: 8px;
+}
+
+.care-section > span {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 800;
+}
+
+.care-section-title {
+  margin-bottom: 6px;
+  font-weight: 900;
+}
+
+.care-chip {
+  display: grid;
+  gap: 1px;
+  place-items: center;
+}
+
+.care-chip span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.care-chip strong {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.panel-status-text {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.ai-section {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(126, 54, 40, 0.18);
+}
+
+.ai-toggle-row,
+.ai-key-row,
+.ai-chat-form {
+  display: grid;
+  gap: 5px;
+}
+
+.ai-toggle-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ai-toggle-row label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 24px;
+  border: 1px solid rgba(126, 54, 40, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 249, 239, 0.72);
+  font-weight: 800;
+}
+
+.ai-toggle-row input {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  accent-color: var(--warm-red);
+}
+
+.ai-key-row {
+  grid-template-columns: minmax(0, 1fr) 42px 42px;
+  margin-top: 6px;
+}
+
+.ai-setting-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.ai-setting-grid label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: rgba(51, 32, 26, 0.82);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ai-chat-form {
+  grid-template-columns: minmax(0, 1fr) 46px;
+  margin-top: 7px;
+}
+
+.ai-quick-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 48px;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.ai-key-input,
+.ai-chat-input,
+.ai-setting-grid input,
+.ai-setting-grid textarea {
+  min-width: 0;
+  min-height: 28px;
+  border: 1px solid rgba(126, 54, 40, 0.2);
+  border-radius: 7px;
+  background: rgba(255, 249, 239, 0.86);
+  font-weight: 700;
+}
+
+.ai-key-input,
+.ai-chat-input {
+  padding: 4px 7px;
+}
+
+.ai-setting-grid input {
+  height: 25px;
+  min-height: 25px;
+  padding: 2px 5px;
+  font-size: 10px;
+}
+
+.ai-setting-grid textarea {
+  min-height: 64px;
+  padding: 5px;
+  resize: vertical;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.ai-setting-grid[hidden] {
+  display: none;
+}
+
+.ai-observe-button,
+.ai-voice-test-button,
+.ai-config-button {
+  width: 100%;
+}
+
+.ai-status-text {
+  margin: 6px 0 0;
+  color: rgba(51, 32, 26, 0.74);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.panel-body .ai-section {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
