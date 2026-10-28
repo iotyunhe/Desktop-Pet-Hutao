@@ -1,8 +1,9 @@
 import './styles/index.css';
+import { PET_WINDOW_BASE_SIZE } from '../../shared';
 import { bindPanelInteractions } from './actions';
 import { getApi } from './api';
 import { AI_OBSERVE_INITIAL_DELAY_MS } from './constants';
-import { mountShell, type ShellElements } from './dom';
+import { getElements, mountShell, type ShellElements } from './dom';
 import { applySettings } from './settings';
 import { state } from './state';
 import { refreshAiStatus, scheduleAiObservation } from './modules/ai';
@@ -17,6 +18,8 @@ import { resetSleepTimer, scheduleIdleComment, scheduleRoam, scheduleTeaOffer } 
 import { stopReplyVoice } from './modules/voice';
 
 const unsubscribers: Array<() => void> = [];
+let panelGuardTimer = 0;
+let panelGuardStrikes = 0;
 
 function bindContextMenu(element: Element): void {
   element.addEventListener('contextmenu', (event) => {
@@ -86,8 +89,44 @@ function bindShell(elements: ShellElements): void {
   });
 }
 
-function bindIpcEvents(): void {
+/**
+ * 兜底校正：如果窗口是展开尺寸但面板已经不可见，或面板状态为 none 但窗口仍很宽，
+ * 连续两次检查后强制归位，避免留下「一大块透明区域 + 菜单在很远处」的残局。
+ */
+function ensurePanelConsistency(): void {
   const api = getApi();
+  if (!api || !state.settings) {
+    return;
+  }
+
+  const petWidth = Math.round(PET_WINDOW_BASE_SIZE.width * state.settings.scale);
+  const panel = getElements().panel;
+  const panelRect = panel.getBoundingClientRect();
+  const inconsistent =
+    state.panelMode === 'none'
+      ? window.innerWidth > petWidth + 16
+      : panel.hidden || panelRect.width < 40;
+
+  if (!inconsistent) {
+    panelGuardStrikes = 0;
+    return;
+  }
+
+  panelGuardStrikes += 1;
+  if (panelGuardStrikes < 2) {
+    return;
+  }
+
+  panelGuardStrikes = 0;
+
+  if (state.panelMode === 'none') {
+    void api.setPanelMode('none');
+  } else {
+    void closePanel();
+  }
+}
+
+function bindIpcEvents(): void {  const api = getApi();
   if (!api) {
     return;
   }
@@ -121,6 +160,15 @@ async function boot(): Promise<void> {
 
   bindShell(elements);
 
+  // 渲染层重载/异常恢复时，主进程可能仍停留在面板展开的窗口尺寸；
+  // 启动时强制归位，避免出现「窗口很宽但面板是空的」。
+  try {
+    await api.setPanelMode('none');
+  } catch (error) {
+    console.error('重置面板布局失败', error);
+  }
+  state.panelMode = 'none';
+
   try {
     applySettings(await api.getSettings());
   } catch (error) {
@@ -138,9 +186,12 @@ async function boot(): Promise<void> {
   scheduleAiObservation(AI_OBSERVE_INITIAL_DELAY_MS);
   scheduleIdleComment();
   scheduleTeaOffer();
+  panelGuardTimer = window.setInterval(ensurePanelConsistency, 1_000);
 }
 
 window.addEventListener('beforeunload', () => {
+  window.clearInterval(panelGuardTimer);
+
   for (const timer of Object.values(state.timers)) {
     window.clearTimeout(timer);
   }

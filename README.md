@@ -37,8 +37,8 @@ npm run dist       # 打包：安装版 exe + 便携版 exe
 
 构建产物在 `release/`：
 
-- `HuTao-Desktop-Pet-Setup-0.4.0-x64.exe`：NSIS 安装包。
-- `HuTao-Desktop-Pet-0.4.0-portable.exe`：免安装便携版。
+- `HuTao-Desktop-Pet-Setup-0.4.1-x64.exe`：NSIS 安装包。
+- `HuTao-Desktop-Pet-0.4.1-portable.exe`：免安装便携版。
 - `win-unpacked/胡桃桌宠.exe`：未压缩目录版，方便调试。
 
 > 打包会写入应用图标与版本信息，electron-builder 首次需要下载 `winCodeSign`。如果它在无管理员权限的机器上解压失败，可用管理员权限运行一次，或把 `winCodeSign-2.6.0.7z` 解压到 `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\winCodeSign-2.6.0` 后重试（只需 Windows 部分，darwin 软链接报错可以忽略）。安装包没有代码签名，首次运行可能触发 SmartScreen，选择「仍要运行」即可。
@@ -62,6 +62,7 @@ npm run dist       # 打包：安装版 exe + 便携版 exe
 - B站：自动逛站开关、免打扰、AI 文案、去逛逛、打开 B 站、最近分享；偏好设置折叠在「偏好设置」里。
 - AI：聊天、AI/观察/语音开关、API Key、观察一下、试音；模型与接口配置折叠在「配置」里。
 - 分享卡仍然独立展开，不会挤占面板。
+- 面板/分享卡关闭、或渲染层与主进程失同步时，会自动把窗口收回桌宠尺寸，不会留下「宽窗口 + 远处菜单按钮」的残局。
 
 ### 温柔养成
 

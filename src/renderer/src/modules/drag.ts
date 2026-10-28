@@ -61,8 +61,11 @@ export async function onPetPointerDown(event: PointerEvent): Promise<void> {
   };
 
   // 面板收起会改变窗口宽度和胡桃位置，等布局稳定后再计算拖拽偏移，避免起手跳一下。
+  // 即使渲染层认为面板已经关闭，也向主进程发一次归位请求，修复两边状态不同步时留下的宽窗口。
   if (state.panelMode !== 'none') {
     await closePanel();
+  } else {
+    await api.setPanelMode('none').catch(() => undefined);
   }
 
   if (!state.dragging || state.pointerId !== event.pointerId) {

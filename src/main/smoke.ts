@@ -2,6 +2,7 @@ import { app, type BrowserWindow } from 'electron';
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { IPC, type BilibiliShare } from '../shared';
 
 export interface SmokeCheck {
   name: string;
@@ -157,6 +158,216 @@ async function readBubbleMetrics(window: BrowserWindow): Promise<BubbleMetrics> 
   }
 
   return raw as BubbleMetrics;
+}
+
+interface PanelSnapshot {
+  hidden: boolean;
+  width: number;
+  bodyOpen: boolean;
+  mode: string | null;
+}
+
+async function readPanelSnapshot(window: BrowserWindow): Promise<PanelSnapshot> {
+  const raw = await window.webContents.executeJavaScript(
+    `(() => {
+      const panel = document.querySelector('.side-panel');
+      if (!panel) return null;
+      const rect = panel.getBoundingClientRect();
+      return {
+        hidden: panel.hidden,
+        width: Math.round(rect.width),
+        bodyOpen: document.body.classList.contains('is-panel-open'),
+        mode: document.body.dataset.panelMode || null
+      };
+    })()`,
+    true
+  );
+
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('找不到侧边面板元素。');
+  }
+
+  return raw as PanelSnapshot;
+}
+
+async function clickMenuButton(window: BrowserWindow): Promise<void> {
+  const clicked = await window.webContents.executeJavaScript(
+    `(() => {
+      const button = document.querySelector('.menu-button');
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+    true
+  );
+
+  if (clicked !== true) {
+    throw new Error('找不到菜单按钮。');
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 600));
+}
+
+/**
+ * 面板回归测试：打开面板 → 关闭面板 → 打开面板后长按胡桃，
+ * 确认窗口宽度会跟着面板展开/收起，不会停留在「宽窗口空面板」状态。
+ */
+export async function runPanelLifecycleProbe(window: BrowserWindow): Promise<SmokeCheck[]> {
+  const checks: SmokeCheck[] = [];
+  const baseline = window.getBounds();
+
+  try {
+    await clickMenuButton(window);
+    const openedBounds = window.getBounds();
+    const openedPanel = await readPanelSnapshot(window);
+
+    checks.push({
+      name: 'panel opens with content',
+      ok:
+        openedBounds.width > baseline.width + 80 &&
+        openedPanel.hidden === false &&
+        openedPanel.bodyOpen === true &&
+        openedPanel.width > 80,
+      detail: `bounds=${openedBounds.width}x${openedBounds.height} panel=${JSON.stringify(openedPanel)}`
+    });
+
+    await clickMenuButton(window);
+    const closedBounds = window.getBounds();
+    const closedPanel = await readPanelSnapshot(window);
+
+    checks.push({
+      name: 'panel close restores width',
+      ok:
+        Math.abs(closedBounds.width - baseline.width) <= 4 &&
+        closedPanel.hidden === true &&
+        closedPanel.bodyOpen === false,
+      detail: `baseline=${baseline.width} after=${closedBounds.width} panel=${JSON.stringify(closedPanel)}`
+    });
+
+    await clickMenuButton(window);
+    const point = (await window.webContents.executeJavaScript(
+      `(() => {
+        const rect = document.querySelector('.pet-button').getBoundingClientRect();
+        return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+      })()`,
+      true
+    )) as { x: number; y: number };
+
+    window.webContents.sendInputEvent({ type: 'mouseDown', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+    window.webContents.sendInputEvent({ type: 'mouseUp', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const afterBounds = window.getBounds();
+    const afterPanel = await readPanelSnapshot(window);
+
+    checks.push({
+      name: 'longpress closes open panel',
+      ok:
+        Math.abs(afterBounds.width - baseline.width) <= 4 &&
+        afterPanel.hidden === true &&
+        afterPanel.bodyOpen === false,
+      detail: `baseline=${baseline.width} after=${afterBounds.width} panel=${JSON.stringify(afterPanel)}`
+    });
+
+    // 制造「主进程已经展开窗口、渲染层却认为面板关闭」的失同步，验证兜底校正会自动归位。
+    await window.webContents.executeJavaScript('window.huTaoPet.setPanelMode("care")', true);
+    await new Promise((resolve) => setTimeout(resolve, 2_600));
+
+    const healedBounds = window.getBounds();
+    const healedPanel = await readPanelSnapshot(window);
+
+    checks.push({
+      name: 'panel desync self-heals',
+      ok:
+        Math.abs(healedBounds.width - baseline.width) <= 4 &&
+        healedPanel.hidden === true &&
+        healedPanel.bodyOpen === false,
+      detail: `baseline=${baseline.width} after=${healedBounds.width} panel=${JSON.stringify(healedPanel)}`
+    });
+  } catch (error) {
+    checks.push({
+      name: 'panel lifecycle probe',
+      ok: false,
+      detail: error instanceof Error ? error.message : String(error)
+    });
+  }
+
+  return checks;
+}
+
+/**
+ * 分享卡回归测试：模拟主进程推送一张分享卡，点击 × 后确认
+ * 窗口宽度回到桌宠尺寸，不会留下「宽窗口空面板」。
+ */
+export async function runShareCardProbe(window: BrowserWindow): Promise<SmokeCheck[]> {
+  const checks: SmokeCheck[] = [];
+  const baseline = window.getBounds();
+  const demoShare: BilibiliShare = {
+    id: 'BV1xx411c7mD',
+    video: {
+      bvid: 'BV1xx411c7mD',
+      title: '冒烟测试分享卡',
+      upName: '往生堂',
+      coverUrl: '',
+      durationSeconds: 180,
+      viewCount: 12_000,
+      danmakuCount: 10,
+      publishedAt: new Date().toISOString(),
+      category: '鬼畜',
+      url: 'https://www.bilibili.com/video/BV1xx411c7mD'
+    },
+    message: '本堂主逛到一张测试分享卡。',
+    reason: '冒烟测试 · 鬼畜 · 1.2万播放',
+    mood: 'happy',
+    source: 'manual',
+    sharedAt: new Date().toISOString()
+  };
+
+  try {
+    window.webContents.send(IPC.bilibiliShareEvent, demoShare);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    const openedBounds = window.getBounds();
+    const openedPanel = await readPanelSnapshot(window);
+    const hasCard = await window.webContents.executeJavaScript(
+      'Boolean(document.querySelector(".share-card"))',
+      true
+    );
+
+    checks.push({
+      name: 'share card opens',
+      ok:
+        openedBounds.width > baseline.width + 80 &&
+        openedPanel.hidden === false &&
+        openedPanel.bodyOpen === true &&
+        hasCard === true,
+      detail: `bounds=${openedBounds.width}x${openedBounds.height} card=${String(hasCard)} panel=${JSON.stringify(openedPanel)}`
+    });
+
+    await window.webContents.executeJavaScript('document.querySelector(".share-close")?.click(); true', true);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    const closedBounds = window.getBounds();
+    const closedPanel = await readPanelSnapshot(window);
+
+    checks.push({
+      name: 'share card close restores width',
+      ok:
+        Math.abs(closedBounds.width - baseline.width) <= 4 &&
+        closedPanel.hidden === true &&
+        closedPanel.bodyOpen === false,
+      detail: `baseline=${baseline.width} after=${closedBounds.width} panel=${JSON.stringify(closedPanel)}`
+    });
+  } catch (error) {
+    checks.push({
+      name: 'share card probe',
+      ok: false,
+      detail: error instanceof Error ? error.message : String(error)
+    });
+  }
+
+  return checks;
 }
 
 /**

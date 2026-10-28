@@ -35,6 +35,7 @@ export class PetWindowManager {
   private panelSide: PanelSide = 'left';
   private mousePassthrough = false;
   private quitting = false;
+  private adjustingBounds = false;
 
   constructor(private readonly options: PetWindowManagerOptions) {}
 
@@ -119,6 +120,7 @@ export class PetWindowManager {
 
     window.on('show', () => this.options.onVisibilityChange?.());
     window.on('hide', () => this.options.onVisibilityChange?.());
+    window.on('resize', () => this.enforceWindowSize());
 
     if (this.options.rendererUrl) {
       await window.loadURL(this.options.rendererUrl);
@@ -195,6 +197,12 @@ export class PetWindowManager {
     }
 
     if (this.panelMode === mode) {
+      if (mode === 'none') {
+        // 状态已经是 none 但窗口可能因异常残留为展开尺寸，这里强制归位。
+        const current = this.window.getBounds();
+        const petSize = this.getPetSize();
+        this.setBounds({ ...petSize, x: current.x, y: current.y });
+      }
       return this.getPanelLayout();
     }
 
@@ -378,6 +386,27 @@ export class PetWindowManager {
     }
 
     return window.getBounds();
+  }
+
+  /** 无论什么原因触发 resize，都把窗口拉回当前面板模式对应的尺寸。 */
+  private enforceWindowSize(): void {
+    const window = this.window;
+    if (!window || window.isDestroyed() || this.adjustingBounds) {
+      return;
+    }
+
+    const expected = this.getWindowSize();
+    const actual = window.getBounds();
+    if (actual.width === expected.width && actual.height === expected.height) {
+      return;
+    }
+
+    this.adjustingBounds = true;
+    try {
+      window.setBounds({ ...actual, width: expected.width, height: expected.height }, false);
+    } finally {
+      this.adjustingBounds = false;
+    }
   }
 
   private setBounds(bounds: Rectangle): Rectangle | null {

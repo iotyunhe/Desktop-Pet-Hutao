@@ -11,7 +11,7 @@ import { BilibiliClient } from './services/bilibili/bilibili-client';
 import { BilibiliService } from './services/bilibili/bilibili-service';
 import { ContentCurator } from './services/bilibili/content-curator';
 import { CareService } from './services/care-service';
-import { runWindowSmokeTest, runLongPressProbe, captureMoodToFile, captureWindowToFile, openCarePanelForCapture, writeSmokeResult, type SmokeCheck } from './smoke';
+import { runWindowSmokeTest, runLongPressProbe, runPanelLifecycleProbe, runShareCardProbe, captureMoodToFile, captureWindowToFile, openCarePanelForCapture, writeSmokeResult, type SmokeCheck } from './smoke';
 import { AiSettingsStore, MiniMaxKeyStore } from './storage/ai-store';
 import { BilibiliHistoryStore, BilibiliSettingsStore } from './storage/bilibili-store';
 import { CareProfileStore } from './storage/profile-store';
@@ -177,9 +177,13 @@ async function bootstrap(): Promise<void> {
       { name: 'app icon', ok: !nativeImage.createFromPath(resolveAppIconPath()).isEmpty(), detail: resolveAppIconPath() }
     ];
 
+    const panelChecks = await runPanelLifecycleProbe(manager.petWindow!);
+    const shareCardChecks = await runShareCardProbe(manager.petWindow!);
     const longPressChecks = await runLongPressProbe(manager.petWindow!);
     const exitCode = await runWindowSmokeTest(manager.petWindow!, smokeResultPath, [
       ...storeChecks,
+      ...panelChecks,
+      ...shareCardChecks,
       ...longPressChecks
     ]);
 
