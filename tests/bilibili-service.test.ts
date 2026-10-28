@@ -61,7 +61,7 @@ function createHarness(
     onShare: (share) => shares.push(share),
     openExternal: async () => undefined,
     copyText: () => undefined,
-    now: () => new Date('2026-10-27T10:00:00+08:00'),
+    now: () => new Date(2026, 9, 27, 10, 0, 0),
     random: () => 0.5,
     ...options
   });
@@ -216,7 +216,7 @@ test('安静时段内到点不逛站，而是推迟到时段之后', async (t) =
   const scheduled: ManualTimer[] = [];
   const harness = createHarness(async () => [makeVideo()], {
     schedule: createManualScheduler(scheduled),
-    now: () => new Date('2026-10-27T01:00:00+08:00')
+    now: () => new Date(2026, 9, 27, 1, 0, 0)
   });
   t.after(() => rmSync(harness.dir, { recursive: true, force: true }));
 
