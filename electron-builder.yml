@@ -18,6 +18,10 @@ extraResources:
     to: tray.png
   - from: resources/icon.png
     to: icon.png
+  # 工作台页面不进 asar，打包后从 resources/workbench/index.html 读取，
+  # 方便用户自己改样式而不用重新编译。
+  - from: tools/hutao-workbench
+    to: workbench
 
 win:
   icon: resources/icon.ico

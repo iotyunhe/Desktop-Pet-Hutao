@@ -55,6 +55,17 @@ export async function updateQqSettingFromInput(input: HTMLInputElement): Promise
 
 export async function updateQqSettingFromTextArea(textarea: HTMLTextAreaElement): Promise<void> {
   const setting = textarea.dataset.qqSetting;
+
+  if (setting === 'adminQqs') {
+    const adminQqs = textarea.value
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    state.qqStatus = await requireApi().updateQqSettings({ adminQqs });
+    refreshPanel();
+    return;
+  }
+
   if (setting !== 'persona') {
     return;
   }

@@ -2,6 +2,28 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)。
 
+## [0.6.0] - 2026-11-21
+
+### Added
+
+- **本机权限板块**：面板新增第 5 个标签「权限」。五种能力全部默认关闭，一项一项打开：读白名单里的文本文件、列白名单目录、看主屏截图、打开登记过的程序/文件/网址、执行命令（**每次都要点「允许」**）。
+- **三层闸门**：策略开关决定工具是否出现在模型侧（不是「被拒绝」，而是模型看不见）；路径闸门先 `realpath` 再比对白名单，拦住 `..` 跳转、符号链接与 `C:\Windows` / `Program Files` / `AppData` 等系统目录；审批队列（2 分钟过期）+ 每小时操作上限（默认 30）。
+- **审计**：每次操作写入 `userData/access-audit.jsonl`，面板显示最近几条，可在工作台里清空。
+- **QQ 管理员**：`adminQqs` 默认空（谁都不能指挥她动电脑）。群里只有「管理员 @ 她」那一句会挂工具，插话与群友的 @ 只聊天；管理员私聊可直接下指令，她做完用一句话回结果。
+- **胡桃工作台**：桌宠内置只监听 `127.0.0.1` 的小 HTTP 服务（默认端口 4649，随机 token），页面在 `tools/hutao-workbench/index.html`，打包后位于 `resources/workbench/index.html`。托盘「胡桃工作台」、权限面板按钮、`胡桃桌宠.exe --open-workbench` 三种打开方式，`scripts/create-workbench-shortcut.ps1` 可在桌面建快捷方式。
+- **工具循环**：`ChatClient.chatWithTools` + `runToolLoop`（最多 3 轮），支持 OpenAI 兼容的 `tools` / `tool_calls`，截图会以 `image_url` 回灌给支持视觉的模型。
+- 新增文档 `docs/access-control.md`、`docs/workbench.md`；新增单测 `access-policy` / `access-service` / `tool-loop`；冒烟新增权限与工作台探针（共 44 项检查）。
+
+### Changed
+
+- 标签栏改为自适应列数，加第 5 个标签也不会折行。
+- `normalizeLaunchEntries` 支持省略 `kind`（按 target 自动推断 url / app / file），手写配置更省事。
+
+### Security
+
+- 默认策略：所有本机能力关闭、管理员列表为空、工作台只监听回环地址且必须有 token。
+- 命令只能在审批通过后执行；不存在写文件/删文件的直接接口。
+
 ## [0.5.1] - 2026-11-21
 
 ### Fixed

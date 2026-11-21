@@ -2,9 +2,11 @@ import { AI_MAX_TOKENS, AI_REPLY_TEXT_LIMIT, type AiConnectionTest, type AiMessa
 import type { BilibiliVideo } from '../../../shared/bilibili';
 import type { AiSettingsStore, LlmKeyStore } from '../../storage/ai-store';
 import type { Logger } from '../../util/logger';
-import { ChatClient, limitReplyText } from './chat-client';
+import type { AiToolDefinition, ToolExecOutcome } from '../access/ai-tools';
+import { ChatClient, limitReplyText, type ChatMessage, type ChatToolCall } from './chat-client';
 import { DesktopObserver } from './desktop-observer';
 import { SystemTts, type TtsVoiceList } from './system-tts';
+import { runToolLoop } from './tool-loop';
 
 export interface AiServiceOptions {
   settings: AiSettingsStore;
@@ -21,6 +23,12 @@ export interface GenerateOptions {
   maxChars?: number;
   temperature?: number;
   maxTokens?: number;
+}
+
+export interface GenerateWithToolsOptions extends GenerateOptions {
+  tools: AiToolDefinition[];
+  execute: (call: ChatToolCall) => Promise<ToolExecOutcome>;
+  maxSteps?: number;
 }
 
 const VOICE_TEST_TEXT = '嘿嘿，本堂主试音营业中。';
@@ -276,6 +284,53 @@ export class AiService {
     } catch (error) {
       this.lastError = error instanceof Error ? error.message : '生成失败。';
       this.options.logger.warn('大模型生成失败', this.lastError ?? '');
+      return null;
+    }
+  }
+
+  /**
+   * 允许模型调用本地工具的生成入口（读文件 / 截图 / 开程序 / 提交命令）。
+   * 工具本身能不能用由 access 策略决定，这里只负责往返。
+   */
+  async generateWithTools(options: GenerateWithToolsOptions): Promise<string | null> {
+    const settings = this.options.settings.get();
+    if (!settings.enabled) {
+      return null;
+    }
+
+    const apiKey = this.options.keys.read();
+    if (!apiKey) {
+      return null;
+    }
+
+    const messages: ChatMessage[] = [
+      { role: 'system', content: options.system },
+      { role: 'user', content: options.user }
+    ];
+
+    try {
+      const result = await runToolLoop(messages, {
+        maxSteps: options.maxSteps,
+        runChat: (current) =>
+          this.options.client.chatWithTools({
+            apiKey,
+            model: settings.textModel,
+            messages: current,
+            tools: options.tools,
+            temperature: options.temperature,
+            maxTokens: options.maxTokens
+          }),
+        execute: options.execute
+      });
+
+      this.lastError = null;
+      if (result.toolCalls > 0) {
+        this.options.logger.info('胡桃调用了本地工具', { tools: result.toolCalls, steps: result.steps });
+      }
+      return limitReplyText(result.text, options.maxChars ?? AI_REPLY_TEXT_LIMIT);
+    } catch (error) {
+      this.lastError = error instanceof Error ? error.message : '生成失败。';
+      this.options.logger.warn('带工具的大模型请求失败', this.lastError ?? '');
       return null;
     }
   }

@@ -1,4 +1,5 @@
 import type {
+  AccessStatus,
   AiConnectionTest,
   AiStatus,
   BilibiliShare,
@@ -39,7 +40,7 @@ export type PetMood =
   | 'stretch';
 
 export type BurstKind = 'happy' | 'curious' | 'sleepy';
-export type PanelTab = 'care' | 'bilibili' | 'ai' | 'qq';
+export type PanelTab = 'care' | 'bilibili' | 'ai' | 'qq' | 'access';
 
 export interface RendererState {
   settings: PetSettings | null;
@@ -47,6 +48,7 @@ export interface RendererState {
   aiStatus: AiStatus | null;
   bilibiliStatus: BilibiliStatus | null;
   qqStatus: QqStatus | null;
+  accessStatus: AccessStatus | null;
   panelMode: PanelMode;
   panelSide: PanelSide;
   panelTab: PanelTab;
@@ -61,6 +63,7 @@ export interface RendererState {
   aiConfigOpen: boolean;
   bilibiliConfigOpen: boolean;
   qqConfigOpen: boolean;
+  accessConfigOpen: boolean;
   /** 「测试连接」的结果，展示在 AI 面板里。 */
   aiTestResult: AiConnectionTest | null;
   /** 可用模型列表，点「拉取列表」后填充。 */
@@ -101,6 +104,7 @@ export const state: RendererState = {
   aiStatus: null,
   bilibiliStatus: null,
   qqStatus: null,
+  accessStatus: null,
   panelMode: 'none',
   panelSide: 'left',
   panelTab: 'care',
@@ -114,6 +118,7 @@ export const state: RendererState = {
   aiConfigOpen: false,
   bilibiliConfigOpen: false,
   qqConfigOpen: false,
+  accessConfigOpen: false,
   aiTestResult: null,
   aiModels: [],
   aiVoices: [],

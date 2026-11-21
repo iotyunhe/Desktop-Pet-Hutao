@@ -13,6 +13,7 @@ export interface TrayControllerOptions {
   onResetPosition: () => void;
   onBrowseBilibili: () => void;
   onToggleBilibili: (enabled: boolean) => void;
+  onOpenWorkbench: () => void;
   onQuit: () => void;
 }
 
@@ -109,6 +110,10 @@ export class TrayController {
         type: 'checkbox',
         checked: bilibili.enabled,
         click: (item) => this.options.onToggleBilibili(item.checked)
+      },
+      {
+        label: '胡桃工作台',
+        click: () => this.options.onOpenWorkbench()
       },
       { type: 'separator' },
       {

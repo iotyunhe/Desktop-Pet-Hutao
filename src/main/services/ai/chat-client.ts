@@ -19,6 +19,43 @@ export interface ChatRequest {
   maxTokens?: number;
 }
 
+export interface ChatToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+export type ChatMessage =
+  | { role: 'system'; content: string }
+  | { role: 'user'; content: string | ChatContentPart[] }
+  | { role: 'assistant'; content: string; tool_calls?: ChatToolCallPayload[] }
+  | { role: 'tool'; tool_call_id: string; content: string };
+
+export type ChatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
+export interface ChatToolCallPayload {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+export interface ChatWithToolsRequest {
+  apiKey: string;
+  model: string;
+  messages: ChatMessage[];
+  tools?: unknown[];
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface ChatWithToolsResult {
+  content: string;
+  toolCalls: ChatToolCall[];
+  finishReason: string | null;
+}
+
 function getRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
 }
@@ -100,9 +137,38 @@ export function extractChatText(payload: unknown): string {
   throw new Error('接口没有返回可显示的回复。');
 }
 
-/** 把各家五花八门的错误体压成一句能看懂的话。 */
-export function extractApiErrorMessage(payload: unknown): string | null {
+/** 从响应里取 message.tool_calls（OpenAI 兼容格式）。 */
+export function extractToolCalls(payload: unknown): ChatToolCall[] {
   const root = getRecord(payload);
+  const choices = Array.isArray(root?.choices) ? root.choices : [];
+  const calls: ChatToolCall[] = [];
+
+  for (const choice of choices) {
+    const choiceRecord = getRecord(choice);
+    const message = choiceRecord ? getNestedRecord(choiceRecord, 'message') : null;
+    const rawCalls = message && Array.isArray(message.tool_calls) ? message.tool_calls : [];
+
+    for (const rawCall of rawCalls) {
+      const callRecord = getRecord(rawCall);
+      const fn = callRecord ? getNestedRecord(callRecord, 'function') : null;
+      const name = fn ? getNestedString(fn, 'name') : null;
+      if (!callRecord || !name) {
+        continue;
+      }
+
+      calls.push({
+        id: getNestedString(callRecord, 'id') ?? `call_${calls.length + 1}`,
+        name,
+        arguments: typeof fn?.arguments === 'string' ? fn.arguments : '{}'
+      });
+    }
+  }
+
+  return calls;
+}
+
+/** 把各家五花八门的错误体压成一句能看懂的话。 */
+export function extractApiErrorMessage(payload: unknown): string | null {  const root = getRecord(payload);
   if (!root) {
     return null;
   }
@@ -129,6 +195,22 @@ export function getBaseUrlHost(baseUrl: string): string | null {
   } catch {
     return null;
   }
+}
+
+function toWireMessage(message: ChatMessage): Record<string, unknown> {
+  if (message.role === 'tool') {
+    return { role: 'tool', tool_call_id: message.tool_call_id, content: message.content };
+  }
+
+  if (message.role === 'assistant') {
+    return {
+      role: 'assistant',
+      content: message.content || null,
+      ...(message.tool_calls && message.tool_calls.length > 0 ? { tool_calls: message.tool_calls } : {})
+    };
+  }
+
+  return { role: message.role, content: message.content };
 }
 
 /**
@@ -159,6 +241,32 @@ export class ChatClient {
     });
 
     return extractChatText(payload);
+  }
+
+  /**
+   * 带工具的一次请求：把 assistant 的 tool_calls 原样解析出来，
+   * 由上层决定怎么执行、要不要再问一轮。
+   */
+  async chatWithTools(request: ChatWithToolsRequest): Promise<ChatWithToolsResult> {
+    const payload = await this.requestJson('chat/completions', request.apiKey, {
+      model: request.model,
+      messages: request.messages.map(toWireMessage),
+      ...(request.tools && request.tools.length > 0 ? { tools: request.tools, tool_choice: 'auto' } : {}),
+      temperature: request.temperature ?? AI_TEMPERATURE,
+      max_tokens: request.maxTokens ?? AI_MAX_TOKENS,
+      stream: false
+    });
+
+    const root = getRecord(payload);
+    const choices = Array.isArray(root?.choices) ? root.choices : [];
+    const firstChoice = choices.length > 0 ? getRecord(choices[0]) : null;
+    const message = firstChoice ? getNestedRecord(firstChoice, 'message') : null;
+
+    return {
+      content: extractTextContent(message?.content) ?? '',
+      toolCalls: extractToolCalls(payload),
+      finishReason: firstChoice ? getNestedString(firstChoice, 'finish_reason') : null
+    };
   }
 
   async listModels(apiKey: string): Promise<AiModelList> {

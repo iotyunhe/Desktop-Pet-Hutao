@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import {
   IPC,
   isPoint,
+  type AccessPolicyPatch,
   type AiMessageRequest,
   type AiSettingsPatch,
   type BilibiliFeedbackRequest,
@@ -13,6 +14,7 @@ import {
   type QqSettingsPatch
 } from '../../shared';
 import type { CareService } from '../services/care-service';
+import type { LocalAccessService } from '../services/access/local-access-service';
 import type { AiService } from '../services/ai/ai-service';
 import type { QqService } from '../services/qq/qq-service';
 import type { BilibiliService } from '../services/bilibili/bilibili-service';
@@ -28,6 +30,9 @@ export interface IpcDependencies {
   care: CareService;
   ai: AiService;
   qq: QqService;
+  access: LocalAccessService;
+  /** 打开本地工作台；没起来就现起一个。 */
+  openWorkbench: () => Promise<{ ok: boolean; url?: string; message?: string }>;
   bilibili: BilibiliService;
   tray: TrayController | null;
   onSettingsChanged: (settings: PetSettings) => void;
@@ -94,6 +99,46 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   ipcMain.handle(IPC.qqDisconnect, () => deps.qq.disconnect());
 
   ipcMain.handle(IPC.qqRefreshGroups, () => deps.qq.refreshGroups());
+
+  ipcMain.handle(IPC.accessGetStatus, () => deps.access.getStatus());
+
+  ipcMain.handle(IPC.accessUpdatePolicy, (_event, patch: unknown) => {
+    deps.access.updatePolicy(patch && typeof patch === 'object' ? (patch as AccessPolicyPatch) : {});
+    return deps.access.getStatus();
+  });
+
+  ipcMain.handle(IPC.accessReadFile, (_event, path: unknown) => {
+    return deps.access.readTextFile(typeof path === 'string' ? path : '', 'panel');
+  });
+
+  ipcMain.handle(IPC.accessListDirectory, (_event, path: unknown) => {
+    return deps.access.listDirectory(typeof path === 'string' ? path : '', 'panel');
+  });
+
+  ipcMain.handle(IPC.accessScreenshot, () => deps.access.screenshot('panel'));
+
+  ipcMain.handle(IPC.accessLaunch, (_event, id: unknown) => {
+    return deps.access.launch(typeof id === 'string' ? id : '', 'panel');
+  });
+
+  ipcMain.handle(IPC.accessRequestCommand, (_event, command: unknown) => {
+    return deps.access.requestCommand(typeof command === 'string' ? command : '', 'panel');
+  });
+
+  ipcMain.handle(IPC.accessApprove, (_event, id: unknown) => {
+    return deps.access.approve(typeof id === 'string' ? id : '', 'panel');
+  });
+
+  ipcMain.handle(IPC.accessDeny, (_event, id: unknown) => {
+    return deps.access.deny(typeof id === 'string' ? id : '', 'panel');
+  });
+
+  ipcMain.handle(IPC.accessClearAudit, () => {
+    deps.access.clearAudit();
+    return deps.access.getStatus();
+  });
+
+  ipcMain.handle(IPC.accessOpenWorkbench, () => deps.openWorkbench());
 
   ipcMain.handle(IPC.bilibiliGetStatus, () => deps.bilibili.getStatus());
 

@@ -17,6 +17,11 @@ import {
 } from './modules/bilibili';
 import { refreshPanel, setPanelTab } from './modules/panel';
 import { handleQqAction, updateQqSettingFromInput, updateQqSettingFromTextArea } from './modules/qq';
+import {
+  handleAccessAction,
+  updateAccessSettingFromInput,
+  updateAccessSettingFromTextArea
+} from './modules/access';
 
 function isCareItemId(value: string | undefined): value is CareItemId {
   return Boolean(value && (CARE_ITEM_IDS as string[]).includes(value));
@@ -34,10 +39,24 @@ export function bindPanelInteractions(panel: HTMLElement): void {
     const target = event.target as Element | null;
 
     const tab = target?.closest<HTMLButtonElement>('[data-panel-tab]')?.dataset.panelTab;
-    if (tab === 'care' || tab === 'bilibili' || tab === 'ai' || tab === 'qq') {
+    if (
+      tab === 'care' ||
+      tab === 'bilibili' ||
+      tab === 'ai' ||
+      tab === 'qq' ||
+      tab === 'access'
+    ) {
       event.preventDefault();
       event.stopPropagation();
       setPanelTab(tab);
+      return;
+    }
+
+    const accessButton = target?.closest<HTMLButtonElement>('[data-access-action]');
+    if (accessButton?.dataset.accessAction) {
+      event.preventDefault();
+      event.stopPropagation();
+      void handleAccessAction(accessButton.dataset.accessAction, accessButton);
       return;
     }
 
@@ -123,6 +142,22 @@ export function bindPanelInteractions(panel: HTMLElement): void {
       event.preventDefault();
       event.stopPropagation();
       void updateQqSettingFromInput(qqInput as HTMLInputElement);
+      return;
+    }
+
+    const accessTextarea = target?.closest<HTMLTextAreaElement>('textarea[data-access-setting]');
+    if (accessTextarea) {
+      event.preventDefault();
+      event.stopPropagation();
+      void updateAccessSettingFromTextArea(accessTextarea);
+      return;
+    }
+
+    const accessInput = target?.closest<HTMLInputElement | HTMLSelectElement>('[data-access-setting]');
+    if (accessInput) {
+      event.preventDefault();
+      event.stopPropagation();
+      void updateAccessSettingFromInput(accessInput);
       return;
     }
 

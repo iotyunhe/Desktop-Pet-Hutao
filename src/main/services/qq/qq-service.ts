@@ -12,6 +12,13 @@ import {
   type QqTrigger
 } from '../../../shared/qq';
 import type { AiService } from '../ai/ai-service';
+import { parseToolArguments } from '../ai/tool-loop';
+import {
+  buildAccessToolDefinitions,
+  buildAccessToolGuide,
+  executeAccessTool
+} from '../access/ai-tools';
+import type { LocalAccessService } from '../access/local-access-service';
 import type { Logger } from '../../util/logger';
 import { formatDateKey, getMinutesOfDay } from '../../util/time';
 import type { QqSettingsStore } from '../../storage/qq-store';
@@ -31,6 +38,8 @@ export interface QqServiceOptions {
   settings: QqSettingsStore;
   ai: AiService;
   logger: Logger;
+  /** 有它才允许管理员的私聊指挥胡桃操作电脑。 */
+  access?: LocalAccessService;
   random?: () => number;
   /** 测试注入用，默认真的起 WebSocket 服务。 */
   gatewayFactory?: (options: { port: number; accessToken: string; logger: Logger }) => OneBotGateway;
@@ -75,6 +84,7 @@ export class QqService {
 
   private readonly groupStates = new Map<number, GroupRuntimeState>();
   private readonly contexts = new Map<number, GroupContext>();
+  private readonly privateLines = new Map<number, ChatLine[]>();
   private readonly random: () => number;
   private readonly now: () => number;
 
@@ -321,6 +331,11 @@ export class QqService {
 
     if (event.post_type === 'message' && event.message_type === 'group') {
       await this.handleGroupMessage(event);
+      return;
+    }
+
+    if (event.post_type === 'message' && event.message_type === 'private') {
+      await this.handlePrivateMessage(event);
     }
   }
 
@@ -382,6 +397,9 @@ export class QqService {
       return;
     }
 
+    // 只有管理员在群里 @ 她时才允许动电脑，普通群友找她聊天就只是聊天。
+    const adminUserId = settings.adminQqs.includes(String(userId)) ? userId : null;
+
     await this.replyToGroup({
       groupId,
       groupName: state.groupName,
@@ -389,7 +407,8 @@ export class QqService {
       speaker: nickname,
       text: parsed.text,
       settings,
-      state
+      state,
+      adminUserId
     });
   }
 
@@ -401,6 +420,7 @@ export class QqService {
     text: string;
     settings: QqSettings;
     state: GroupRuntimeState;
+    adminUserId: number | null;
   }): Promise<void> {
     const gateway = this.gateway;
     if (!gateway || !gateway.online) {
@@ -410,22 +430,54 @@ export class QqService {
     const triggerLabel =
       options.trigger === 'at' ? '被@了' : options.trigger === 'name' ? '有人叫了胡桃的名字' : '只是随手接一句';
 
-    const generated = await this.options.ai.generate({
-      system: buildGroupSystemPrompt({
+    const access = this.options.access;
+    const policy = access?.getPolicy();
+    // 工具只给管理员开，而且只在管理员 @ 她的时候才带；插话永远不带工具。
+    const useTools =
+      Boolean(access && policy?.enabled) && options.adminUserId !== null && options.trigger === 'at';
+    const tools = useTools && policy ? buildAccessToolDefinitions(policy) : [];
+
+    const systemPrompt = [
+      buildGroupSystemPrompt({
         persona: options.settings.persona || this.options.ai.getStatus().settings.persona,
         botName: this.botNickname || '胡桃',
         allowAtReply: options.settings.replyToAt
       }),
-      user: buildGroupUserPrompt({
-        groupName: options.groupName,
-        lines: this.getContext(options.groupId).lines,
-        trigger: triggerLabel,
-        speaker: options.speaker,
-        text: options.text
-      }),
-      maxChars: 60,
-      maxTokens: 320
+      tools.length > 0 && policy ? buildAccessToolGuide(policy) : ''
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const userPrompt = buildGroupUserPrompt({
+      groupName: options.groupName,
+      lines: this.getContext(options.groupId).lines,
+      trigger: triggerLabel,
+      speaker: options.speaker,
+      text: options.text
     });
+
+    const generated =
+      tools.length > 0 && access
+        ? await this.options.ai.generateWithTools({
+            system: systemPrompt,
+            user: userPrompt,
+            maxChars: 90,
+            maxTokens: 640,
+            tools,
+            execute: (call) =>
+              executeAccessTool(
+                access,
+                call.name,
+                parseToolArguments(call),
+                `qq:${options.adminUserId ?? 'unknown'}`
+              )
+          })
+        : await this.options.ai.generate({
+            system: systemPrompt,
+            user: userPrompt,
+            maxChars: 60,
+            maxTokens: 320
+          });
 
     const fallback =
       options.trigger === 'interject'
@@ -462,6 +514,127 @@ export class QqService {
       at,
       trigger: options.trigger
     });
+  }
+
+  /**
+   * 私聊只服务管理员：其他任何人私聊她都不理，避免被陌生人拿来操作电脑。
+   * 管理员私聊时按策略把本地工具挂上，她就能真的读文件、看屏幕、开程序、请求执行命令。
+   */
+  private async handlePrivateMessage(event: OneBotEvent): Promise<void> {
+    const settings = this.options.settings.get();
+    if (!settings.enabled) {
+      return;
+    }
+
+    const selfId = Number(event.self_id ?? 0);
+    const userId = Number(event.user_id ?? event.sender?.user_id ?? 0);
+    if (!userId || userId === selfId) {
+      return;
+    }
+
+    if (!settings.adminQqs.includes(String(userId))) {
+      return;
+    }
+
+    const gateway = this.gateway;
+    if (!gateway || !gateway.online) {
+      return;
+    }
+
+    const parsed = parseGroupMessage(event.message ?? event.raw_message ?? '', selfId, this.getBotNames());
+    const text = parsed.text.trim();
+    if (!text) {
+      return;
+    }
+
+    const access = this.options.access;
+    const policy = access?.getPolicy();
+    const tools = access && policy ? buildAccessToolDefinitions(policy) : [];
+
+    const history = this.getPrivateLines(userId);
+    history.push({ nickname: '主人', text, at: this.now() });
+    if (history.length > 20) {
+      history.splice(0, history.length - 20);
+    }
+
+    const systemPrompt = [
+      this.buildPrivateSystemPrompt(settings),
+      tools.length > 0 && policy ? buildAccessToolGuide(policy) : ''
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const userPrompt = [
+      `现在是 QQ 私聊，对方是主人（QQ ${userId}）。`,
+      '最近对话：',
+      ...history.slice(-10).map((line) => `${line.nickname}：${line.text}`),
+      '',
+      `请回主人这一句：${text}`
+    ].join('\n');
+
+    const generated =
+      tools.length > 0 && access
+        ? await this.options.ai.generateWithTools({
+            system: systemPrompt,
+            user: userPrompt,
+            maxChars: 200,
+            maxTokens: 768,
+            tools,
+            execute: (call) => executeAccessTool(access, call.name, parseToolArguments(call), `qq:${userId}`)
+          })
+        : await this.options.ai.generate({
+            system: systemPrompt,
+            user: userPrompt,
+            maxChars: 200,
+            maxTokens: 512
+          });
+
+    const replyText = sanitizeGroupReply(generated ?? '', 220);
+    if (!replyText) {
+      this.lastError = '私聊回复生成失败。';
+      this.emitStatus();
+      return;
+    }
+
+    const bubbles = splitIntoBubbles(replyText, this.random, 2);
+    try {
+      for (const [index, bubble] of bubbles.entries()) {
+        await sleep(index === 0 ? estimateTypingDelayMs(bubble, this.random) : 800 + this.random() * 1200);
+        await gateway.call('send_private_msg', {
+          user_id: userId,
+          message: [{ type: 'text', data: { text: bubble } }]
+        });
+      }
+    } catch (error) {
+      this.lastError = error instanceof Error ? error.message : '发送私聊消息失败。';
+      this.emitStatus();
+      return;
+    }
+
+    history.push({ nickname: this.botNickname || '胡桃', text: bubbles.join(' '), at: this.now() });
+  }
+
+  private buildPrivateSystemPrompt(settings: QqSettings): string {
+    const persona = settings.persona || this.options.ai.getStatus().settings.persona;
+    return [
+      `你是「${this.botNickname || '胡桃'}」，胡桃的桌宠人格，正在 QQ 里跟主人私聊。`,
+      persona ? `人设：${persona}` : '',
+      '说话风格：短句、口语、可以撒娇吐槽，不要 Markdown、不要编号列表、不要自称 AI 或语言模型。',
+      '主人可能让你操作电脑：你能用工具做的就去做，做完用一句话说结果；做不到就直说做不到，绝对不要假装做过。'
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  private getPrivateLines(userId: number): ChatLine[] {
+    const existing = this.privateLines.get(userId);
+    if (existing) {
+      return existing;
+    }
+
+    const lines: ChatLine[] = [];
+    this.privateLines.set(userId, lines);
+    return lines;
   }
 
   private recordReply(log: QqReplyLog): void {

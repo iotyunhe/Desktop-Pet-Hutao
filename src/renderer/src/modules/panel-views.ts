@@ -5,6 +5,7 @@ import {
   formatDuration,
   formatViewCount,
   truncateText,
+  type AccessStatus,
   type AiStatus,
   type BilibiliShare,
   type BilibiliStatus,
@@ -349,6 +350,11 @@ function renderQqSection(state: RendererState): string {
         <label>群聊人设<textarea maxlength="500" rows="3" data-qq-setting="persona" placeholder="留空就沿用 AI 面板里的胡桃人设">${escapeHtml(
           settings.persona
         )}</textarea></label>
+        <label>管理员 QQ（每行一个，能指挥她动电脑）
+          <textarea rows="2" data-qq-setting="adminQqs" placeholder="982019603">${escapeHtml(
+            settings.adminQqs.join('\n')
+          )}</textarea>
+        </label>
       </div>
       ${renderQqGroups(state)}
       ${renderQqReplies(status)}
@@ -449,6 +455,128 @@ function renderBilibiliSection(state: RendererState): string {
   `;
 }
 
+function getAccessStatusText(status: AccessStatus | null): string {
+  if (!status) {
+    return '权限状态读取中。';
+  }
+
+  const { policy } = status;
+  if (!policy.enabled) {
+    return '本机访问已关闭，胡桃只会聊天，碰不到你的电脑。';
+  }
+
+  const abilities = [
+    policy.allowRead ? `读文件（${policy.readRoots.length} 个目录）` : '',
+    policy.allowScreenshot ? '看屏幕' : '',
+    policy.allowLaunch ? `开程序（${policy.launchAllowlist.length} 个）` : '',
+    policy.allowShell ? '跑命令（需你点确认）' : ''
+  ].filter(Boolean);
+
+  if (abilities.length === 0) {
+    return '总开关开着，但四项能力都还关着。';
+  }
+
+  return `已允许：${abilities.join('、')}。本小时已用 ${status.opsLastHour}/${policy.maxOpsPerHour} 次。`;
+}
+
+function renderAccessPending(status: AccessStatus | null): string {
+  const pending = status?.pending ?? [];
+  if (pending.length === 0) {
+    return '<p class="panel-hint">没有等你确认的操作。</p>';
+  }
+
+  return `
+    <div class="access-pending">
+      <span>等你确认</span>
+      ${pending
+        .map(
+          (entry) => `
+            <div class="access-pending-item">
+              <code>${escapeHtml(truncateText(entry.target, 60))}</code>
+              <div class="access-pending-actions">
+                <button type="button" class="panel-link-button" data-access-action="approve" data-pending-id="${escapeHtml(entry.id)}">允许</button>
+                <button type="button" class="panel-link-button" data-access-action="deny" data-pending-id="${escapeHtml(entry.id)}">拒绝</button>
+              </div>
+            </div>
+          `
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+function renderAccessAudit(status: AccessStatus | null): string {
+  const audit = (status?.audit ?? []).slice(-3).reverse();
+  if (audit.length === 0) {
+    return '';
+  }
+
+  return `
+    <div class="access-audit">
+      <span>最近的本地操作</span>
+      ${audit
+        .map(
+          (entry) => `
+            <div class="access-audit-item">
+              <span class="access-audit-actor">${escapeHtml(entry.actor)}</span>
+              <span class="access-audit-action">${entry.ok ? '✅' : '⛔'} ${escapeHtml(entry.action)}</span>
+              <span class="access-audit-target">${escapeHtml(truncateText(entry.target, 28))}</span>
+            </div>
+          `
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+function renderAccessSection(state: RendererState): string {
+  const status = state.accessStatus;
+  const policy = status?.policy;
+
+  if (!policy) {
+    return `
+      <div class="access-section panel-tab-content">
+        <div class="panel-section-head"><strong>权限</strong></div>
+        <p class="panel-section-sub">权限状态读取中。</p>
+      </div>
+    `;
+  }
+
+  const launchText = policy.launchAllowlist
+    .map((entry) => `${entry.label}|${entry.target}`)
+    .join('\n');
+
+  return `
+    <div class="access-section panel-tab-content">
+      <div class="panel-section-head">
+        <strong>本机权限</strong>
+        <button type="button" class="panel-link-button" data-access-action="toggle-config" aria-expanded="${state.accessConfigOpen}">${state.accessConfigOpen ? '收起配置' : '配置'}</button>
+      </div>
+      <p class="panel-section-sub">${escapeHtml(getAccessStatusText(status))}</p>
+      <div class="access-toggle-row">
+        <label><input type="checkbox" data-access-setting="enabled" ${policy.enabled ? 'checked' : ''}>总开关</label>
+        <label><input type="checkbox" data-access-setting="allowRead" ${policy.allowRead ? 'checked' : ''}>读文件</label>
+        <label><input type="checkbox" data-access-setting="allowScreenshot" ${policy.allowScreenshot ? 'checked' : ''}>看屏幕</label>
+        <label><input type="checkbox" data-access-setting="allowLaunch" ${policy.allowLaunch ? 'checked' : ''}>开程序</label>
+        <label><input type="checkbox" data-access-setting="allowShell" ${policy.allowShell ? 'checked' : ''}>跑命令</label>
+      </div>
+      <div class="access-quick-row">
+        <button type="button" data-access-action="open-workbench">打开工作台</button>
+        <button type="button" data-access-action="screenshot" ${policy.enabled && policy.allowScreenshot ? '' : 'disabled'}>让她看一眼屏幕</button>
+      </div>
+      <div class="access-setting-grid" ${state.accessConfigOpen ? '' : 'hidden'}>
+        <label>只读目录（每行一个绝对路径）<textarea rows="3" data-access-setting="readRoots" placeholder="E:\\Project\\HuTao">${escapeHtml(policy.readRoots.join('\n'))}</textarea></label>
+        <label>允许打开（每行「名字|路径或网址」）<textarea rows="3" data-access-setting="launchAllowlist" placeholder="记事本|C:\\Windows\\notepad.exe">${escapeHtml(launchText)}</textarea></label>
+        <label>每小时操作上限<input type="number" min="1" max="200" step="1" data-access-setting="maxOpsPerHour" value="${policy.maxOpsPerHour}"></label>
+        <label>命令超时（毫秒）<input type="number" min="3000" max="60000" step="1000" data-access-setting="shellTimeoutMs" value="${policy.shellTimeoutMs}"></label>
+      </div>
+      ${renderAccessPending(status)}
+      ${renderAccessAudit(status)}
+      <p class="panel-hint">跑命令永远要在这里点「允许」才会执行；关掉的选项，模型连工具都看不到。</p>
+    </div>
+  `;
+}
+
 export function renderCarePanel(state: RendererState): string {
   const content =
     state.panelTab === 'care'
@@ -457,7 +585,9 @@ export function renderCarePanel(state: RendererState): string {
         ? renderBilibiliSection(state)
         : state.panelTab === 'qq'
           ? renderQqSection(state)
-          : renderAiSection(state);
+          : state.panelTab === 'access'
+            ? renderAccessSection(state)
+            : renderAiSection(state);
 
   return `
     <div class="panel-tabs" role="tablist" aria-label="胡桃面板">
@@ -465,6 +595,7 @@ export function renderCarePanel(state: RendererState): string {
       ${renderTabButton(state, 'bilibili', 'B站')}
       ${renderTabButton(state, 'ai', 'AI')}
       ${renderTabButton(state, 'qq', 'QQ')}
+      ${renderTabButton(state, 'access', '权限')}
     </div>
     <div class="panel-body" role="tabpanel">
       ${content}

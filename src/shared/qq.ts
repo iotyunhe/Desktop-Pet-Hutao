@@ -28,6 +28,8 @@ export interface QqSettings {
   quietHoursEnd: string;
   /** 群聊专用人设，留空则沿用 AI 面板里的胡桃人设。 */
   persona: string;
+  /** 主人（管理员）QQ：只有这些人私聊能指挥她动电脑，群里也只有这些人能触发本地工具。 */
+  adminQqs: string[];
 }
 
 export type QqSettingsPatch = Partial<QqSettings>;
@@ -74,12 +76,14 @@ export const DEFAULT_QQ_SETTINGS: QqSettings = {
   quietHoursEnabled: true,
   quietHoursStart: '01:00',
   quietHoursEnd: '08:00',
-  persona: ''
+  persona: '',
+  adminQqs: []
 };
 
 export const MIN_QQ_PORT = 1024;
 export const MAX_QQ_PORT = 65535;
 export const MAX_QQ_GROUPS = 20;
+export const MAX_QQ_ADMINS = 10;
 export const MAX_QQ_REPLY_TEXT = 120;
 export const QQ_REPLY_WINDOW_MS = 10 * 60_000;
 export const QQ_CONTEXT_MESSAGES = 16;

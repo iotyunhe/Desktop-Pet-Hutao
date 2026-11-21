@@ -27,6 +27,11 @@ import {
   type SmokeCheck
 } from './smoke';
 import { AiSettingsStore, LlmKeyStore } from './storage/ai-store';
+import { AccessSettingsStore } from './storage/access-store';
+import { LocalAccessService } from './services/access/local-access-service';
+import { capturePrimaryScreen, runPowerShellCommand } from './services/access/platform-access';
+import { WorkbenchServer, resolveWorkbenchPage } from './workbench/server';
+import { runAccessProbe, runWorkbenchProbe } from './smoke-access';
 import { BilibiliHistoryStore, BilibiliSettingsStore } from './storage/bilibili-store';
 import { CareProfileStore } from './storage/profile-store';
 import { QqSettingsStore } from './storage/qq-store';
@@ -50,6 +55,7 @@ const captureMoodArg = argv.find((arg) => arg.startsWith('--capture-mood='));
 const captureMood = captureMoodArg ? captureMoodArg.slice('--capture-mood='.length) : null;
 const captureTabArg = argv.find((arg) => arg.startsWith('--capture-tab='));
 const captureTab = captureTabArg ? captureTabArg.slice('--capture-tab='.length) : null;
+const openWorkbenchOnStart = argv.includes('--open-workbench');
 
 if (isSmokeRun) {
   // 冒烟测试使用独立 userData，不污染真实桌宠的存档。
@@ -121,9 +127,25 @@ async function bootstrap(): Promise<void> {
     app.exit(exitCode);
     return;
   }
+
+  const accessSettings = new AccessSettingsStore(userDataDir);
+  accessSettings.load();
+  const accessService = new LocalAccessService({
+    getPolicy: () => accessSettings.get(),
+    savePolicy: (policy) => accessSettings.replace(policy),
+    userDataDir,
+    logger,
+    captureScreen: capturePrimaryScreen,
+    runShell: runPowerShellCommand,
+    openPath: (target) => shell.openPath(target),
+    openExternal: (url) => shell.openExternal(url),
+    onChange: () => manager?.send(IPC.accessChanged, accessService.getStatus())
+  });
+
   const qqService = new QqService({
     settings: qqSettings,
     ai: aiService,
+    access: accessService,
     logger
   });
   const careService = new CareService(careProfile);
@@ -155,6 +177,31 @@ async function bootstrap(): Promise<void> {
     onVisibilityChange: () => tray?.refresh()
   });
 
+  const workbench = new WorkbenchServer({
+    access: accessService,
+    qq: qqService,
+    ai: aiService,
+    logger,
+    appVersion: app.getVersion(),
+    findPageFile: () => {
+      const file = resolveWorkbenchPage(app.getAppPath(), process.resourcesPath, app.isPackaged);
+      return existsSync(file) ? file : null;
+    },
+    browseBilibili: () => {
+      void bilibiliService.browse({ source: 'manual' });
+    }
+  });
+
+  const openWorkbench = async (): Promise<{ ok: boolean; url?: string; message?: string }> => {
+    const url = workbench.url() ?? (await workbench.start());
+    if (!url) {
+      return { ok: false, message: '工作台没能启动，看看日志里有没有端口被占用。' };
+    }
+
+    await shell.openExternal(url);
+    return { ok: true, url };
+  };
+
   tray = new TrayController({
     settings,
     bilibiliSettings,
@@ -182,6 +229,9 @@ async function bootstrap(): Promise<void> {
       bilibiliService.updateSettings({ enabled });
       tray?.refresh();
     },
+    onOpenWorkbench: () => {
+      void openWorkbench();
+    },
     onQuit: () => quitApp()
   });
 
@@ -191,6 +241,8 @@ async function bootstrap(): Promise<void> {
     care: careService,
     ai: aiService,
     qq: qqService,
+    access: accessService,
+    openWorkbench,
     bilibili: bilibiliService,
     tray,
     onSettingsChanged: notifySettingsChanged,
@@ -209,6 +261,7 @@ async function bootstrap(): Promise<void> {
       { name: 'care profile file', ok: existsSync(join(userDataDir, 'profile.json')) },
       { name: 'bilibili settings file', ok: existsSync(join(userDataDir, 'bilibili-settings.json')) },
       { name: 'qq settings file', ok: existsSync(join(userDataDir, 'qq-settings.json')) },
+      { name: 'access settings file', ok: existsSync(join(userDataDir, 'access-settings.json')) },
       { name: 'tray icon', ok: !trayIcon.isEmpty(), detail: resolveTrayIconPath() },
       { name: 'app icon', ok: !nativeImage.createFromPath(resolveAppIconPath()).isEmpty(), detail: resolveAppIconPath() }
     ];
@@ -217,12 +270,20 @@ async function bootstrap(): Promise<void> {
     const shareCardChecks = await runShareCardProbe(manager.petWindow!);
     const longPressChecks = await runLongPressProbe(manager.petWindow!);
     const qqChecks = await runQqGatewayProbe();
+    const accessChecks = await runAccessProbe();
+    const workbenchChecks = await runWorkbenchProbe(
+      existsSync(resolveWorkbenchPage(app.getAppPath(), process.resourcesPath, app.isPackaged))
+        ? resolveWorkbenchPage(app.getAppPath(), process.resourcesPath, app.isPackaged)
+        : null
+    );
     const exitCode = await runWindowSmokeTest(manager.petWindow!, smokeResultPath, [
       ...storeChecks,
       ...panelChecks,
       ...shareCardChecks,
       ...longPressChecks,
-      ...qqChecks
+      ...qqChecks,
+      ...accessChecks,
+      ...workbenchChecks
     ]);
 
     if (exitCode === 0 && capturePath && captureMood) {
@@ -279,6 +340,9 @@ async function bootstrap(): Promise<void> {
   if (qqSettings.get().enabled) {
     void qqService.connect();
   }
+  if (openWorkbenchOnStart) {
+    void openWorkbench();
+  }
   logger.info('胡桃桌宠启动完成', {
     version: app.getVersion(),
     scale: settings.get().scale,
@@ -291,6 +355,7 @@ async function bootstrap(): Promise<void> {
     manager?.savePosition();
     bilibiliService.dispose();
     void qqService.dispose();
+    void workbench.stop();
   });
 }
 

@@ -1,4 +1,15 @@
 import type {
+  AccessCommandResult,
+  AccessListing,
+  AccessPendingEntry,
+  AccessPolicyPatch,
+  AccessReadResult,
+  AccessResult,
+  AccessScreenshot,
+  AccessStatus,
+  WorkbenchOpenResult
+} from './access';
+import type {
   AiConnectionTest,
   AiMessageRequest,
   AiModelList,
@@ -47,6 +58,19 @@ export const IPC = {
   qqDisconnect: 'qq:disconnect',
   qqRefreshGroups: 'qq:refresh-groups',
   qqStatusEvent: 'qq:status',
+
+  accessGetStatus: 'access:get-status',
+  accessUpdatePolicy: 'access:update-policy',
+  accessReadFile: 'access:read-file',
+  accessListDirectory: 'access:list-directory',
+  accessScreenshot: 'access:screenshot',
+  accessLaunch: 'access:launch',
+  accessRequestCommand: 'access:request-command',
+  accessApprove: 'access:approve',
+  accessDeny: 'access:deny',
+  accessClearAudit: 'access:clear-audit',
+  accessOpenWorkbench: 'access:open-workbench',
+  accessChanged: 'access:changed',
 
   bilibiliGetStatus: 'bilibili:get-status',
   bilibiliUpdateSettings: 'bilibili:update-settings',
@@ -109,6 +133,19 @@ export interface HuTaoPetApi {
   disconnectQq: () => Promise<QqStatus>;
   refreshQqGroups: () => Promise<QqGroupInfo[]>;
   onQqStatus: (listener: (status: QqStatus) => void) => Unsubscribe;
+
+  getAccessStatus: () => Promise<AccessStatus>;
+  updateAccessPolicy: (patch: AccessPolicyPatch) => Promise<AccessStatus>;
+  readAccessFile: (path: string) => Promise<AccessResult<AccessReadResult>>;
+  listAccessDirectory: (path: string) => Promise<AccessResult<AccessListing>>;
+  takeAccessScreenshot: () => Promise<AccessResult<AccessScreenshot>>;
+  launchAccessEntry: (id: string) => Promise<AccessResult<{ label: string; target: string }>>;
+  requestAccessCommand: (command: string) => Promise<AccessResult<AccessPendingEntry>>;
+  approveAccessRequest: (id: string) => Promise<AccessResult<AccessCommandResult>>;
+  denyAccessRequest: (id: string) => Promise<boolean>;
+  clearAccessAudit: () => Promise<AccessStatus>;
+  openWorkbench: () => Promise<WorkbenchOpenResult>;
+  onAccessChanged: (listener: (status: AccessStatus) => void) => Unsubscribe;
 
   getBilibiliStatus: () => Promise<BilibiliStatus>;
   updateBilibiliSettings: (patch: BilibiliSettingsPatch) => Promise<BilibiliStatus>;

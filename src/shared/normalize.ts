@@ -30,7 +30,21 @@ import {
   type PetCareProfile
 } from './care';
 import {
+  DEFAULT_ACCESS_POLICY,
+  MAX_ACCESS_OPS_PER_HOUR,
+  MAX_LAUNCH_ENTRIES,
+  MAX_READ_ROOTS,
+  MAX_SHELL_TIMEOUT_MS,
+  MAX_WORKBENCH_PORT,
+  MIN_ACCESS_OPS_PER_HOUR,
+  MIN_SHELL_TIMEOUT_MS,
+  MIN_WORKBENCH_PORT,
+  type AccessPolicy,
+  type LaunchEntry
+} from './access';
+import {
   DEFAULT_QQ_SETTINGS,
+  MAX_QQ_ADMINS,
   MAX_QQ_GROUPS,
   MAX_QQ_PORT,
   MIN_QQ_PORT,
@@ -318,6 +332,217 @@ export function normalizeQqSettings(value: unknown): QqSettings {
     quietHoursEnabled: Boolean(merged.quietHoursEnabled),
     quietHoursStart,
     quietHoursEnd,
-    persona
+    persona,
+    adminQqs: normalizeQqAdmins(merged.adminQqs)
+  };
+}
+
+export function normalizeQqAdmins(value: unknown): string[] {
+  const rawList = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/[,，、\s]+/) : [];
+  const seen = new Set<string>();
+  const admins: string[] = [];
+
+  for (const item of rawList) {
+    const uin = typeof item === 'string' ? item.replace(/\D/g, '') : '';
+    if (uin.length < 5 || uin.length > 12 || seen.has(uin)) {
+      continue;
+    }
+
+    seen.add(uin);
+    admins.push(uin);
+
+    if (admins.length >= MAX_QQ_ADMINS) {
+      break;
+    }
+  }
+
+  return admins;
+}
+
+/** 工作台/权限面板里能配置的「可读目录」：只接受绝对路径，拒绝系统目录和盘符根。 */
+const BLOCKED_ACCESS_PREFIXES = [
+  'c:\\windows',
+  'c:\\program files',
+  'c:\\program files (x86)',
+  'c:\\programdata',
+  'c:\\$recycle.bin',
+  'c:\\system volume information',
+  'c:\\perflogs',
+  'c:\\recovery'
+];
+
+export function isBlockedAccessPath(value: string): boolean {
+  const lower = value.toLowerCase().replace(/[\\/]+$/, '');
+  if (/^[a-z]:$/.test(lower)) {
+    return true;
+  }
+
+  if (BLOCKED_ACCESS_PREFIXES.some((prefix) => lower === prefix || lower.startsWith(`${prefix}\\`))) {
+    return true;
+  }
+
+  // 用户目录下的 AppData（浏览器存档、凭据都在里面）。
+  return /^[a-z]:\\users\\[^\\]+\\appdata(\\|$)/.test(lower);
+}
+
+function normalizeAbsolutePath(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const unified = value.trim().replace(/\//g, '\\').replace(/\\+/g, '\\');
+  if (!unified) {
+    return null;
+  }
+
+  const isDrivePath = /^[a-zA-Z]:\\/.test(unified);
+  const isUncPath = /^\\\\[^\\]+\\[^\\]+/.test(unified);
+  if (!isDrivePath && !isUncPath) {
+    return null;
+  }
+
+  const trimmed = unified.replace(/\\+$/, '');
+  // 盘符根（C:\）和盘符本身（C:）都不许当白名单目录。
+  if (/^[a-zA-Z]:$/.test(trimmed) || trimmed.length < 4) {
+    return null;
+  }
+
+  return isDrivePath ? trimmed : unified.replace(/\\+$/, '');
+}
+
+export function normalizeAccessRoot(value: unknown): string | null {
+  const path = normalizeAbsolutePath(value);
+  if (!path || isBlockedAccessPath(path)) {
+    return null;
+  }
+
+  return path;
+}
+
+export function normalizeAccessRoots(value: unknown): string[] {
+  const rawList = Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+  const seen = new Set<string>();
+  const roots: string[] = [];
+
+  for (const item of rawList) {
+    const root = normalizeAccessRoot(item);
+    if (!root || seen.has(root.toLowerCase())) {
+      continue;
+    }
+
+    seen.add(root.toLowerCase());
+    roots.push(root);
+
+    if (roots.length >= MAX_READ_ROOTS) {
+      break;
+    }
+  }
+
+  return roots;
+}
+
+function normalizeLaunchTarget(value: unknown, kind: LaunchEntry['kind']): string | null {
+  if (kind === 'url') {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    try {
+      const url = new URL(value.trim());
+      return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return normalizeAbsolutePath(value);
+}
+
+/** 手写配置里没写 kind 时，按 target 猜一个。 */
+function inferLaunchKind(target: string): LaunchEntry['kind'] | null {
+  if (!target) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(target)) {
+    return 'url';
+  }
+
+  if (/\.(exe|lnk|bat|cmd)$/i.test(target)) {
+    return 'app';
+  }
+
+  return /^[a-zA-Z]:\\|^\\\\/.test(target) ? 'file' : null;
+}
+
+export function normalizeLaunchEntries(value: unknown): LaunchEntry[] {
+  const rawList = Array.isArray(value) ? value : [];
+  const seen = new Set<string>();
+  const entries: LaunchEntry[] = [];
+
+  for (const item of rawList) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+
+    const raw = item as Partial<LaunchEntry>;
+    const rawTarget = typeof raw.target === 'string' ? raw.target.trim() : '';
+    const kind: LaunchEntry['kind'] | null =
+      raw.kind === 'app' || raw.kind === 'file' || raw.kind === 'url'
+        ? raw.kind
+        : inferLaunchKind(rawTarget);
+    if (!kind) {
+      continue;
+    }
+
+    const target = normalizeLaunchTarget(raw.target, kind);
+    if (!target || seen.has(target.toLowerCase())) {
+      continue;
+    }
+
+    const label = typeof raw.label === 'string' ? raw.label.replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+    if (!label) {
+      continue;
+    }
+
+    const id =
+      typeof raw.id === 'string' && /^[a-z0-9-]{1,32}$/i.test(raw.id)
+        ? raw.id.toLowerCase()
+        : `item-${entries.length + 1}`;
+
+    seen.add(target.toLowerCase());
+    entries.push({ id, label, target, kind });
+
+    if (entries.length >= MAX_LAUNCH_ENTRIES) {
+      break;
+    }
+  }
+
+  return entries;
+}
+
+export function normalizeAccessPolicy(value: unknown): AccessPolicy {
+  const raw = value && typeof value === 'object' ? (value as Partial<AccessPolicy>) : {};
+  const merged = { ...DEFAULT_ACCESS_POLICY, ...raw };
+  const token = typeof merged.workbenchToken === 'string' ? merged.workbenchToken.trim().replace(/[^\w-]/g, '').slice(0, 64) : '';
+
+  return {
+    enabled: Boolean(merged.enabled),
+    allowRead: Boolean(merged.allowRead),
+    readRoots: normalizeAccessRoots(merged.readRoots),
+    allowScreenshot: Boolean(merged.allowScreenshot),
+    allowLaunch: Boolean(merged.allowLaunch),
+    launchAllowlist: normalizeLaunchEntries(merged.launchAllowlist),
+    allowShell: Boolean(merged.allowShell),
+    shellTimeoutMs: Math.round(
+      clamp(finiteNumber(merged.shellTimeoutMs, DEFAULT_ACCESS_POLICY.shellTimeoutMs), MIN_SHELL_TIMEOUT_MS, MAX_SHELL_TIMEOUT_MS)
+    ),
+    maxOpsPerHour: Math.round(
+      clamp(finiteNumber(merged.maxOpsPerHour, DEFAULT_ACCESS_POLICY.maxOpsPerHour), MIN_ACCESS_OPS_PER_HOUR, MAX_ACCESS_OPS_PER_HOUR)
+    ),
+    workbenchPort: Math.round(
+      clamp(finiteNumber(merged.workbenchPort, DEFAULT_ACCESS_POLICY.workbenchPort), MIN_WORKBENCH_PORT, MAX_WORKBENCH_PORT)
+    ),
+    workbenchToken: token
   };
 }

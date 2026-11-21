@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>胡桃工作台</title>
+    <style>
+      :root {
+        --bg: #14090c;
+        --panel: #1d0f14;
+        --panel-2: #261318;
+        --line: #3a1f26;
+        --text: #f6e9e4;
+        --muted: #b09a9c;
+        --accent: #e6543f;
+        --accent-2: #ffb35c;
+        --ok: #57c98b;
+        --warn: #f0b429;
+        --err: #ff6b6b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        background: radial-gradient(1200px 600px at 20% -10%, #3a1418 0%, var(--bg) 55%);
+        color: var(--text);
+        font: 14px/1.6 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0.04em;
+      }
+
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        padding: 4px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .chip b {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .chip.ok {
+        border-color: #2c6b4a;
+        color: var(--ok);
+      }
+
+      .chip.err {
+        border-color: #6b2c2c;
+        color: var(--err);
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      }
+
+      section {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel);
+        padding: 16px;
+      }
+
+      section > h2 {
+        margin: 0 0 12px;
+        font-size: 15px;
+        letter-spacing: 0.06em;
+        color: var(--accent-2);
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      label.check {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        padding: 6px 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel-2);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      input[type='checkbox'] {
+        accent-color: var(--accent);
+      }
+
+      input[type='text'],
+      input[type='number'],
+      textarea {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #12080a;
+        color: var(--text);
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 84px;
+        resize: vertical;
+        font-family: 'Cascadia Mono', Consolas, monospace;
+        font-size: 12.5px;
+      }
+
+      button {
+        padding: 8px 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel-2);
+        color: var(--text);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button.primary {
+        border-color: transparent;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #2a0d09;
+        font-weight: 700;
+      }
+
+      button:hover {
+        filter: brightness(1.12);
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .item {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel-2);
+        padding: 10px;
+        font-size: 12.5px;
+      }
+
+      .item .top {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--muted);
+      }
+
+      pre.out {
+        margin: 8px 0 0;
+        padding: 10px;
+        max-height: 220px;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #0e0507;
+        color: #d8c6c2;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      img.shot {
+        width: 100%;
+        margin-top: 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 6px 0 0;
+      }
+
+      .badge {
+        padding: 1px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>胡桃工作台</h1>
+        <p class="hint" id="subtitle">正在连本机服务…</p>
+      </div>
+      <div class="chips" id="chips"></div>
+    </header>
+
+    <div class="grid">
+      <section>
+        <h2>权限总开关</h2>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="p-enabled" />允许胡桃访问本机</label>
+          <label class="check"><input type="checkbox" id="p-read" />读文件</label>
+          <label class="check"><input type="checkbox" id="p-shot" />看屏幕</label>
+          <label class="check"><input type="checkbox" id="p-launch" />开程序</label>
+          <label class="check"><input type="checkbox" id="p-shell" />跑命令</label>
+        </div>
+        <p class="hint">关掉的能力，模型连工具都看不到；跑命令永远要你在这里点确认。</p>
+        <div class="row">
+          <label style="flex: 1">
+            只读目录（每行一个）
+            <textarea id="p-roots" placeholder="E:\Project\HuTao&#10;D:\notes"></textarea>
+          </label>
+        </div>
+        <div class="row">
+          <label style="flex: 1">
+            允许打开的东西（每行「名字|路径或网址」）
+            <textarea id="p-launch-list" placeholder="记事本|C:\Windows\notepad.exe&#10;B站|https://www.bilibili.com"></textarea>
+          </label>
+        </div>
+        <div class="row">
+          <label>每小时操作上限<input type="number" id="p-maxops" min="1" max="200" style="width: 90px" /></label>
+          <label>命令超时(ms)<input type="number" id="p-shelltimeout" min="3000" max="60000" step="1000" style="width: 110px" /></label>
+          <button class="primary" id="save-policy">保存权限</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>等待确认</h2>
+        <div class="list" id="pending"><p class="muted">没有待确认的操作。</p></div>
+        <h2 style="margin-top: 18px">审计记录</h2>
+        <div class="list" id="audit"></div>
+        <div class="row" style="margin-top: 10px">
+          <button id="clear-audit">清空审计</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>手动试试</h2>
+        <div class="row">
+          <input type="text" id="probe-path" placeholder="E:\Project\HuTao\README.md" />
+          <button id="probe-read">读文件</button>
+          <button id="probe-list">列目录</button>
+          <button id="probe-shot">截屏</button>
+        </div>
+        <pre class="out" id="probe-out">这里会显示结果。</pre>
+        <img class="shot" id="shot-view" alt="" hidden />
+      </section>
+
+      <section>
+        <h2>QQ 群聊</h2>
+        <div class="list" id="qq-info"></div>
+        <div class="row" style="margin-top: 10px">
+          <button id="qq-groups">刷新群列表</button>
+          <button id="qq-browse">让她去逛 B 站</button>
+        </div>
+        <p class="hint">只有这里的「管理员 QQ」私聊她、或在群里 @ 她，她才会动电脑。</p>
+        <label>
+          管理员 QQ（每行一个）
+          <textarea id="qq-admins" placeholder="982019603"></textarea>
+        </label>
+        <div class="row">
+          <button class="primary" id="qq-save-admins">保存管理员</button>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const state = { token: '', status: null };
+
+      function tokenFromLocation() {
+        const url = new URL(location.href);
+        const token = url.searchParams.get('t') || '';
+        url.searchParams.delete('t');
+        history.replaceState(null, '', url.pathname + url.search);
+        return token;
+      }
+
+      async function api(path, options = {}) {
+        const headers = Object.assign({ 'x-hutao-token': state.token }, options.headers || {});
+        if (options.body) {
+          headers['content-type'] = 'application/json';
+        }
+        const response = await fetch(path, Object.assign({}, options, { headers }));
+        return response.json();
+      }
+
+      async function act(action, payload) {
+        const result = await api('/api/action', {
+          method: 'POST',
+          body: JSON.stringify({ action, payload })
+        });
+        if (!result.ok) {
+          toast(result.message || result.reason || '操作失败');
+        }
+        return result;
+      }
+
+      function toast(message) {
+        const box = document.getElementById('probe-out');
+        if (box) {
+          box.textContent = String(message);
+        }
+      }
+
+      function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      function chips(status) {
+        const wrap = document.getElementById('chips');
+        wrap.replaceChildren();
+        const access = status.access.policy;
+        const add = (label, value, cls) => {
+          const chip = el('span', 'chip ' + (cls || ''));
+          chip.append(label + ' ');
+          chip.append(el('b', '', value));
+          wrap.append(chip);
+        };
+        add('版本', status.app.version);
+        add('本机访问', access.enabled ? '已开' : '已关', access.enabled ? 'ok' : 'err');
+        add('QQ', status.qq.state, status.qq.state === 'online' ? 'ok' : status.qq.state === 'error' ? 'err' : '');
+        add('模型', status.ai.model, status.ai.hasApiKey ? 'ok' : 'err');
+        add('今日发言', String(status.qq.todayReplies));
+      }
+
+      function renderPolicy(policy) {
+        document.getElementById('p-enabled').checked = !!policy.enabled;
+        document.getElementById('p-read').checked = !!policy.allowRead;
+        document.getElementById('p-shot').checked = !!policy.allowScreenshot;
+        document.getElementById('p-launch').checked = !!policy.allowLaunch;
+        document.getElementById('p-shell').checked = !!policy.allowShell;
+        document.getElementById('p-roots').value = (policy.readRoots || []).join('\n');
+        document.getElementById('p-launch-list').value = (policy.launchAllowlist || [])
+          .map((entry) => entry.label + '|' + entry.target)
+          .join('\n');
+        document.getElementById('p-maxops').value = policy.maxOpsPerHour;
+        document.getElementById('p-shelltimeout').value = policy.shellTimeoutMs;
+      }
+
+      function renderPending(pending) {
+        const wrap = document.getElementById('pending');
+        wrap.replaceChildren();
+        if (!pending.length) {
+          wrap.append(el('p', 'muted', '没有待确认的操作。'));
+          return;
+        }
+        for (const entry of pending) {
+          const item = el('div', 'item');
+          const top = el('div', 'top');
+          top.append(el('span', '', entry.action + ' · ' + entry.actor));
+          top.append(el('span', '', new Date(entry.createdAt).toLocaleTimeString()));
+          item.append(top);
+          item.append(el('pre', 'out', entry.target + (entry.detail ? '\n' + entry.detail : '')));
+          const row = el('div', 'row');
+          const ok = el('button', 'primary', '允许这一次');
+          ok.onclick = async () => {
+            const result = await act('approve', { id: entry.id });
+            toast(result.ok ? result.data && result.data.output ? result.data.output : '已执行。' : result.message);
+            await refresh();
+          };
+          const no = el('button', '', '拒绝');
+          no.onclick = async () => {
+            await act('deny', { id: entry.id });
+            await refresh();
+          };
+          row.append(ok, no);
+          item.append(row);
+          wrap.append(item);
+        }
+      }
+
+      function renderAudit(audit) {
+        const wrap = document.getElementById('audit');
+        wrap.replaceChildren();
+        if (!audit.length) {
+          wrap.append(el('p', 'muted', '还没有记录。'));
+          return;
+        }
+        for (const entry of audit) {
+          const item = el('div', 'item');
+          const top = el('div', 'top');
+          top.append(el('span', '', entry.action + ' · ' + entry.actor));
+          top.append(el('span', '', new Date(entry.at).toLocaleTimeString()));
+          item.append(top);
+          item.append(el('div', 'muted', (entry.ok ? '✅ ' : '⛔ ') + (entry.reason || 'ok') + ' · ' + entry.target));
+          wrap.append(item);
+        }
+      }
+
+      function renderQq(qq) {
+        const wrap = document.getElementById('qq-info');
+        wrap.replaceChildren();
+        const lines = [
+          ['连接状态', qq.state],
+          ['小号', qq.selfQq || '未设置'],
+          ['昵称', qq.botNickname || '未知'],
+          ['白名单群', (qq.allowedGroups || []).join('、') || '还没加'],
+          ['管理员', (qq.adminQqs || []).join('、') || '还没设'],
+          ['最近发言', (qq.recentReplies || []).map((r) => r.text).join(' / ') || '还没说过话']
+        ];
+        for (const [key, value] of lines) {
+          const item = el('div', 'item');
+          item.append(el('span', 'muted', key + '：'));
+          item.append(el('span', '', String(value)));
+          wrap.append(item);
+        }
+        document.getElementById('qq-admins').value = (qq.adminQqs || []).join('\n');
+      }
+
+      async function refresh() {
+        const status = await api('/api/status');
+        if (!status.ok) {
+          document.getElementById('subtitle').textContent = status.message || '连不上桌宠。';
+          return;
+        }
+        state.status = status;
+        document.getElementById('subtitle').textContent =
+          '本机服务 ' + location.host + ' · 模型 ' + status.ai.model + ' · 全是本地操作，不经过云。';
+        chips(status);
+        renderPolicy(status.access.policy);
+        renderPending(status.access.pending || []);
+        renderAudit(status.access.audit || []);
+        renderQq(status.qq);
+      }
+
+      function parseLaunch(text) {
+        return text
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line, index) => {
+            const [label, target] = line.split('|').map((part) => (part || '').trim());
+            const kind = /^https?:\/\//i.test(target || '') ? 'url' : 'app';
+            return { id: 'item-' + (index + 1), label: label || target, target: target || label, kind };
+          });
+      }
+
+      document.getElementById('save-policy').onclick = async () => {
+        const patch = {
+          enabled: document.getElementById('p-enabled').checked,
+          allowRead: document.getElementById('p-read').checked,
+          allowScreenshot: document.getElementById('p-shot').checked,
+          allowLaunch: document.getElementById('p-launch').checked,
+          allowShell: document.getElementById('p-shell').checked,
+          readRoots: document.getElementById('p-roots').value.split('\n').map((v) => v.trim()).filter(Boolean),
+          launchAllowlist: parseLaunch(document.getElementById('p-launch-list').value),
+          maxOpsPerHour: Number(document.getElementById('p-maxops').value),
+          shellTimeoutMs: Number(document.getElementById('p-shelltimeout').value)
+        };
+        const result = await act('save-policy', { patch });
+        toast(result.message);
+        await refresh();
+      };
+
+      document.getElementById('probe-read').onclick = async () => {
+        const result = await act('read-file', { path: document.getElementById('probe-path').value });
+        document.getElementById('probe-out').textContent = result.ok ? result.data.content : result.message;
+      };
+
+      document.getElementById('probe-list').onclick = async () => {
+        const result = await act('list-dir', { path: document.getElementById('probe-path').value });
+        document.getElementById('probe-out').textContent = result.ok
+          ? result.data.entries.map((e) => (e.kind === 'dir' ? '[目录] ' : '[文件] ') + e.name).join('\n')
+          : result.message;
+      };
+
+      document.getElementById('probe-shot').onclick = async () => {
+        const result = await act('screenshot', {});
+        const img = document.getElementById('shot-view');
+        if (result.ok) {
+          img.src = 'data:' + result.data.mimeType + ';base64,' + result.data.base64;
+          img.hidden = false;
+          document.getElementById('probe-out').textContent = '截屏完成。';
+        } else {
+          img.hidden = true;
+          document.getElementById('probe-out').textContent = result.message;
+        }
+      };
+
+      document.getElementById('clear-audit').onclick = async () => {
+        await act('clear-audit', {});
+        await refresh();
+      };
+
+      document.getElementById('qq-groups').onclick = async () => {
+        const result = await act('refresh-qq-groups', {});
+        toast(result.message);
+        await refresh();
+      };
+
+      document.getElementById('qq-browse').onclick = async () => {
+        const result = await act('browse-bilibili', {});
+        toast(result.message);
+      };
+
+      document.getElementById('qq-save-admins').onclick = async () => {
+        const adminQqs = document
+          .getElementById('qq-admins')
+          .value.split('\n')
+          .map((v) => v.trim())
+          .filter(Boolean);
+        const result = await act('save-qq', { patch: { adminQqs } });
+        toast(result.message);
+        await refresh();
+      };
+
+      state.token = tokenFromLocation();
+      refresh();
+      setInterval(refresh, 4000);
+    </script>
+  </body>
+</html>

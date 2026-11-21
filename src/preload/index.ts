@@ -1,6 +1,15 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import {
   IPC,
+  type AccessCommandResult,
+  type AccessListing,
+  type AccessPendingEntry,
+  type AccessPolicyPatch,
+  type AccessReadResult,
+  type AccessResult,
+  type AccessScreenshot,
+  type AccessStatus,
+  type WorkbenchOpenResult,
   type AiConnectionTest,
   type AiMessageRequest,
   type AiModelList,
@@ -71,6 +80,23 @@ const api: HuTaoPetApi = {
   disconnectQq: () => invoke<QqStatus>(IPC.qqDisconnect),
   refreshQqGroups: () => invoke<QqGroupInfo[]>(IPC.qqRefreshGroups),
   onQqStatus: (listener) => subscribe<QqStatus>(IPC.qqStatusEvent, listener),
+
+  getAccessStatus: () => invoke<AccessStatus>(IPC.accessGetStatus),
+  updateAccessPolicy: (patch: AccessPolicyPatch) => invoke<AccessStatus>(IPC.accessUpdatePolicy, patch),
+  readAccessFile: (path: string) => invoke<AccessResult<AccessReadResult>>(IPC.accessReadFile, path),
+  listAccessDirectory: (path: string) =>
+    invoke<AccessResult<AccessListing>>(IPC.accessListDirectory, path),
+  takeAccessScreenshot: () => invoke<AccessResult<AccessScreenshot>>(IPC.accessScreenshot),
+  launchAccessEntry: (id: string) =>
+    invoke<AccessResult<{ label: string; target: string }>>(IPC.accessLaunch, id),
+  requestAccessCommand: (command: string) =>
+    invoke<AccessResult<AccessPendingEntry>>(IPC.accessRequestCommand, command),
+  approveAccessRequest: (id: string) =>
+    invoke<AccessResult<AccessCommandResult>>(IPC.accessApprove, id),
+  denyAccessRequest: (id: string) => invoke<boolean>(IPC.accessDeny, id),
+  clearAccessAudit: () => invoke<AccessStatus>(IPC.accessClearAudit),
+  openWorkbench: () => invoke<WorkbenchOpenResult>(IPC.accessOpenWorkbench),
+  onAccessChanged: (listener) => subscribe<AccessStatus>(IPC.accessChanged, listener),
 
   getBilibiliStatus: () => invoke<BilibiliStatus>(IPC.bilibiliGetStatus),
   updateBilibiliSettings: (patch: BilibiliSettingsPatch) =>
