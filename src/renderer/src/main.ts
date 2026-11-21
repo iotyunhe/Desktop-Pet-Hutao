@@ -13,6 +13,7 @@ import { refreshCareProfile } from './modules/care';
 import { onDocumentPointerMove, onDocumentPointerUp, onPetPointerDown } from './modules/drag';
 import { setPressing } from './modules/mood';
 import { closePanel, refreshPanel, toggleCarePanel } from './modules/panel';
+import { applyQqStatus, refreshQqStatus } from './modules/qq';
 import { updateMousePassthrough } from './modules/passthrough';
 import { resetSleepTimer, scheduleIdleComment, scheduleRoam, scheduleTeaOffer } from './modules/roam';
 import { stopReplyVoice } from './modules/voice';
@@ -61,6 +62,7 @@ function bindShell(elements: ShellElements): void {
       void refreshCareProfile();
       void refreshAiStatus();
       void refreshBilibiliStatus();
+      void refreshQqStatus();
     });
   });
 
@@ -146,6 +148,11 @@ function bindIpcEvents(): void {  const api = getApi();
       void handlePushedShare(share);
     })
   );
+  unsubscribers.push(
+    api.onQqStatus((status) => {
+      applyQqStatus(status);
+    })
+  );
 }
 
 async function boot(): Promise<void> {
@@ -175,7 +182,7 @@ async function boot(): Promise<void> {
     console.error('读取桌宠设置失败', error);
   }
 
-  await Promise.allSettled([refreshCareProfile(), refreshAiStatus(), refreshBilibiliStatus()]);
+  await Promise.allSettled([refreshCareProfile(), refreshAiStatus(), refreshBilibiliStatus(), refreshQqStatus()]);
 
   bindIpcEvents();
   refreshPanel();

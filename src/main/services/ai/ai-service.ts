@@ -1,23 +1,34 @@
-import type { AiMessageRequest, AiReply, AiSettingsPatch, AiStatus } from '../../../shared/ai';
+import { AI_REPLY_TEXT_LIMIT, type AiConnectionTest, type AiMessageRequest, type AiModelList, type AiReply, type AiSettingsPatch, type AiStatus } from '../../../shared/ai';
 import type { BilibiliVideo } from '../../../shared/bilibili';
-import type { AiSettingsStore, MiniMaxKeyStore } from '../../storage/ai-store';
+import type { AiSettingsStore, LlmKeyStore } from '../../storage/ai-store';
 import type { Logger } from '../../util/logger';
+import { ChatClient, limitReplyText } from './chat-client';
 import { DesktopObserver } from './desktop-observer';
-import { MiniMaxClient, limitReplyText } from './minimax-client';
+import { SystemTts, type TtsVoiceList } from './system-tts';
 
 export interface AiServiceOptions {
   settings: AiSettingsStore;
-  keys: MiniMaxKeyStore;
-  client: MiniMaxClient;
+  keys: LlmKeyStore;
+  client: ChatClient;
   observer: DesktopObserver;
+  tts: SystemTts;
   logger: Logger;
 }
 
+export interface GenerateOptions {
+  system: string;
+  user: string;
+  maxChars?: number;
+  temperature?: number;
+  maxTokens?: number;
+}
+
 const VOICE_TEST_TEXT = '嘿嘿，本堂主试音营业中。';
+const CONNECTION_TEST_PROMPT = '用一句 12 字以内的话跟桌宠的主人打个招呼，要有精神一点。';
 
 /**
- * AI 互动门面：把「配置 / Key / 对话 / 观察 / 语音」收在一处，
- * 渲染层只看 status 与 reply，不需要知道 MiniMax 的细节。
+ * AI 互动门面：把「配置 / Key / 对话 / 观察 / 语音」收在一处。
+ * 具体是哪家模型由 chat-client 的 base URL 决定，这一层不认识厂商。
  */
 export class AiService {
   private lastError: string | null = null;
@@ -26,11 +37,13 @@ export class AiService {
 
   getStatus(): AiStatus {
     const observer = this.options.observer;
+    const keys = this.options.keys;
 
     return {
       settings: this.options.settings.get(),
-      hasApiKey: Boolean(this.options.keys.read()),
-      encryptionAvailable: this.options.keys.isEncryptionAvailable(),
+      hasApiKey: Boolean(keys.read()),
+      keySource: keys.source(),
+      encryptionAvailable: keys.isEncryptionAvailable(),
       lastObservedAt: observer.getLastObservedAt(),
       lastObservedTitle: observer.getLastObservedTitle(),
       lastError: this.lastError ?? observer.getLastError()
@@ -39,17 +52,17 @@ export class AiService {
 
   saveKey(key: string): AiStatus {
     if (!this.options.keys.isEncryptionAvailable()) {
-      this.lastError = '当前系统不可用 Electron safeStorage，无法安全保存 MiniMax API Key。';
+      this.lastError = '当前系统不可用 Electron safeStorage，无法安全保存 Key。';
       return this.getStatus();
     }
 
     if (!key.trim()) {
-      this.lastError = 'MiniMax API Key 不能为空。';
+      this.lastError = 'API Key 不能为空。';
       return this.getStatus();
     }
 
     if (!this.options.keys.save(key)) {
-      this.lastError = '保存 MiniMax API Key 失败，请重试。';
+      this.lastError = '保存 API Key 失败，请重试。';
       return this.getStatus();
     }
 
@@ -69,6 +82,53 @@ export class AiService {
     return this.getStatus();
   }
 
+  async listModels(): Promise<AiModelList> {
+    const apiKey = this.options.keys.read();
+    if (!apiKey) {
+      return { ok: false, models: [], error: '还没有配置 API Key。' };
+    }
+
+    return this.options.client.listModels(apiKey);
+  }
+
+  async listVoices(): Promise<TtsVoiceList> {
+    return this.options.tts.listVoices();
+  }
+
+  /** 真的打一次接口，让人看到延迟和模型回的话，而不是「保存成功」。 */
+  async testConnection(): Promise<AiConnectionTest> {
+    const settings = this.options.settings.get();
+    const apiKey = this.options.keys.read();
+    const startedAt = Date.now();
+
+    if (!apiKey) {
+      return { ok: false, model: settings.textModel, latencyMs: 0, reply: '', error: '还没有配置 API Key。' };
+    }
+
+    try {
+      const reply = await this.options.client.chat({
+        apiKey,
+        model: settings.textModel,
+        system: '你是一个接入测试助手，只回一句话。',
+        user: CONNECTION_TEST_PROMPT,
+        temperature: 0.6,
+        maxTokens: 160
+      });
+
+      this.lastError = null;
+      return {
+        ok: true,
+        model: settings.textModel,
+        latencyMs: Date.now() - startedAt,
+        reply
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '连接测试失败。';
+      this.lastError = message;
+      return { ok: false, model: settings.textModel, latencyMs: Date.now() - startedAt, reply: '', error: message };
+    }
+  }
+
   async sendMessage(request: AiMessageRequest): Promise<AiReply> {
     const text = typeof request?.text === 'string' ? request.text.trim() : '';
     const settings = this.options.settings.get();
@@ -83,7 +143,7 @@ export class AiService {
 
     const apiKey = this.options.keys.read();
     if (!apiKey) {
-      return this.systemReply('还没有保存新的 MiniMax API Key，先配置一下吧。');
+      return this.systemReply('还没有配置 API Key，先在 AI 面板里填一个。');
     }
 
     try {
@@ -94,15 +154,11 @@ export class AiService {
         user: text
       });
       this.lastError = null;
-      return this.attachVoiceIfEnabled(apiKey, {
-        ok: true,
-        source: 'chat',
-        text: replyText
-      });
+      return this.attachVoiceIfEnabled({ ok: true, source: 'chat', text: replyText });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'MiniMax 对话失败。';
-      this.options.logger.warn('MiniMax 对话失败', message);
-      return this.systemReply('MiniMax 那边有点忙，本堂主先记下这句话。', message);
+      const message = error instanceof Error ? error.message : '对话失败。';
+      this.options.logger.warn('大模型对话失败', message);
+      return this.systemReply('模型那边有点忙，本堂主先记下这句话。', message);
     }
   }
 
@@ -114,7 +170,7 @@ export class AiService {
 
     const apiKey = this.options.keys.read();
     if (!apiKey) {
-      return this.systemReply('还没有保存新的 MiniMax API Key，先配置一下吧。');
+      return this.systemReply('还没有配置 API Key，先在 AI 面板里填一个。');
     }
 
     const observation = await this.options.observer.read();
@@ -146,17 +202,17 @@ export class AiService {
 
       this.options.observer.markReplied(observation);
       this.lastError = null;
-      return this.attachVoiceIfEnabled(apiKey, {
+      return this.attachVoiceIfEnabled({
         ok: true,
         source: 'desktop-observation',
         text: replyText,
         observed: observation
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'MiniMax 桌面观察回复失败。';
+      const message = error instanceof Error ? error.message : '桌面观察回复失败。';
       this.options.observer.setError(message);
       return this.systemReply(
-        `我看到你现在在 ${observation.appName}：${observation.title}。不过 MiniMax 暂时没接上话。`,
+        `我看到你现在在 ${observation.appName}：${observation.title}。不过模型暂时没接上话。`,
         message
       );
     }
@@ -168,37 +224,32 @@ export class AiService {
       return this.systemReply('AI 互动还没开启，先打开开关再试音吧。');
     }
 
-    const apiKey = this.options.keys.read();
-    if (!apiKey) {
-      return this.systemReply('还没有保存新的 MiniMax API Key，先配置一下吧。');
+    if (settings.ttsEngine !== 'system') {
+      return this.systemReply('语音播报现在是关闭的，先在配置里打开。');
     }
 
     try {
-      const audioBase64 = await this.options.client.tts({
-        apiKey,
-        text: VOICE_TEST_TEXT,
-        model: settings.ttsModel,
-        voiceId: settings.voiceId
-      });
+      const audio = await this.options.tts.speak(VOICE_TEST_TEXT, settings.ttsVoice);
       this.lastError = null;
       return {
         ok: true,
         source: 'system',
-        text: '同步语音合成成功。',
-        audioBase64,
-        audioMimeType: 'audio/mpeg'
+        text: `语音测试成功，当前音色：${audio.voice}。`,
+        audioBase64: audio.audioBase64,
+        audioMimeType: audio.mimeType
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : '同步语音合成失败。';
+      const message = error instanceof Error ? error.message : '语音测试失败。';
+      this.options.logger.warn('系统语音测试失败', message);
       return this.systemReply(`语音测试失败：${message}`, message);
     }
   }
 
   /**
-   * B 站分享时，如果 AI 已配置，就让胡桃现写一句推荐语。
-   * 只把标题 / 分区 / UP 主 / 播放量交给模型，不上传任何本地内容。
+   * 给其它模块（B 站分享、QQ 群聊）用的通用生成入口。
+   * 关闭 AI 或没有 Key 时返回 null，调用方自己决定降级文案。
    */
-  async writeVideoCommentary(video: BilibiliVideo, reason: string): Promise<string | null> {
+  async generate(options: GenerateOptions): Promise<string | null> {
     const settings = this.options.settings.get();
     if (!settings.enabled) {
       return null;
@@ -213,28 +264,44 @@ export class AiService {
       const text = await this.options.client.chat({
         apiKey,
         model: settings.textModel,
-        system: [
-          this.buildSystemPrompt(),
-          '现在你在给用户推荐一条 B 站视频。只根据给出的标题、UP 主、分区、播放量写一句推荐语。',
-          '不要编造视频里的具体画面或情节，不要说“我看完了”，不要输出链接。'
-        ].join('\n'),
-        user: [
-          `标题：${video.title}`,
-          `UP 主：${video.upName}`,
-          `分区：${video.category}`,
-          `播放量：${video.viewCount}`,
-          `推荐理由：${reason}`,
-          '请用一句 40 字以内的话推荐它，带一点胡桃的古灵精怪。'
-        ].join('\n'),
-        temperature: 0.9,
-        maxTokens: 120
+        system: options.system,
+        user: options.user,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens
       });
 
-      return limitReplyText(text, 56);
+      this.lastError = null;
+      return limitReplyText(text, options.maxChars ?? AI_REPLY_TEXT_LIMIT);
     } catch (error) {
-      this.options.logger.warn('B 站推荐语生成失败', error instanceof Error ? error.message : error);
+      this.lastError = error instanceof Error ? error.message : '生成失败。';
+      this.options.logger.warn('大模型生成失败', this.lastError ?? '');
       return null;
     }
+  }
+
+  /**
+   * B 站分享时，如果 AI 已配置，就让胡桃现写一句推荐语。
+   * 只把标题 / 分区 / UP 主 / 播放量交给模型，不上传任何本地内容。
+   */
+  async writeVideoCommentary(video: BilibiliVideo, reason: string): Promise<string | null> {
+    return this.generate({
+      system: [
+        this.buildSystemPrompt(),
+        '现在你在给用户推荐一条 B 站视频。只根据给出的标题、UP 主、分区、播放量写一句推荐语。',
+        '不要编造视频里的具体画面或情节，不要说“我看完了”，不要输出链接。'
+      ].join('\n'),
+      user: [
+        `标题：${video.title}`,
+        `UP 主：${video.upName}`,
+        `分区：${video.category}`,
+        `播放量：${video.viewCount}`,
+        `推荐理由：${reason}`,
+        '请用一句 40 字以内的话推荐它，带一点胡桃的古灵精怪。'
+      ].join('\n'),
+      maxChars: 56,
+      temperature: 0.9,
+      maxTokens: 120
+    });
   }
 
   private buildSystemPrompt(): string {
@@ -248,24 +315,18 @@ export class AiService {
     ].join('\n');
   }
 
-  private async attachVoiceIfEnabled(apiKey: string, reply: AiReply): Promise<AiReply> {
+  private async attachVoiceIfEnabled(reply: AiReply): Promise<AiReply> {
     const settings = this.options.settings.get();
-    if (!reply.ok || !settings.voiceEnabled) {
+    if (!reply.ok || !settings.voiceEnabled || settings.ttsEngine === 'off') {
       return reply;
     }
 
     try {
-      const audioBase64 = await this.options.client.tts({
-        apiKey,
-        text: reply.text,
-        model: settings.ttsModel,
-        voiceId: settings.voiceId
-      });
-
+      const audio = await this.options.tts.speak(reply.text, settings.ttsVoice);
       return {
         ...reply,
-        audioBase64,
-        audioMimeType: 'audio/mpeg'
+        audioBase64: audio.audioBase64,
+        audioMimeType: audio.mimeType
       };
     } catch (error) {
       this.lastError = error instanceof Error ? `语音生成失败：${error.message}` : '语音生成失败。';

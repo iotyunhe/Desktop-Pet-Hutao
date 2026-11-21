@@ -5,17 +5,17 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-3b82f6.svg)](#)
 [![Electron](https://img.shields.io/badge/Electron-42-47848f.svg)](https://www.electronjs.org/)
 
-一个 Windows 优先的 2D Electron 桌宠：透明置顶、拖拽漫步、点击反应、温柔养成、MiniMax AI 对话，以及 **自己定时去 B 站逛、把好看好玩的内容分享给你** 的「B 站漫游」。桌宠现有 25 个动作状态，其中 12 个是新增的「撑伞、放灯、扮鬼、画符、递茶」等形象。
+一个 Windows 优先的 2D Electron 桌宠：透明置顶、拖拽漫步、点击反应、温柔养成、可自由换模型（默认 OpenCode + deepseek-v4.1-flash）的 AI 对话、**自己定时去 B 站逛并分享内容**，以及 **挂在小号上到群里聊天** 的 QQ 板块。桌宠现有 25 个动作状态，其中 12 个是新增的「撑伞、放灯、扮鬼、画符、递茶」等形象。
 
 > 这是本地运行的非商业 fan-art 项目，与 HoYoverse 无关。《原神》与胡桃角色版权归 HoYoverse 所有。
 
 ## 界面预览
 
-互动面板改成「互动 / B站 / AI」三个标签页，操作和配置不再堆在一条长列表里：
+互动面板有「互动 / B站 / AI / QQ」四个标签页，操作和配置不再堆在一条长列表里：
 
-| 互动 | B站 | AI |
-| --- | --- | --- |
-| ![互动面板](docs/screenshots/care-panel.png) | ![B站面板](docs/screenshots/bilibili-panel.png) | ![AI面板](docs/screenshots/ai-panel.png) |
+| 互动 | B站 | AI | QQ |
+| --- | --- | --- | --- |
+| ![互动面板](docs/screenshots/care-panel.png) | ![B站面板](docs/screenshots/bilibili-panel.png) | ![AI面板](docs/screenshots/ai-panel.png) | ![QQ面板](docs/screenshots/qq-panel.png) |
 
 B 站分享卡：
 
@@ -37,8 +37,8 @@ npm run dist       # 打包：安装版 exe + 便携版 exe
 
 构建产物在 `release/`：
 
-- `HuTao-Desktop-Pet-Setup-0.4.1-x64.exe`：NSIS 安装包。
-- `HuTao-Desktop-Pet-0.4.1-portable.exe`：免安装便携版。
+- `HuTao-Desktop-Pet-Setup-0.5.0-x64.exe`：NSIS 安装包。
+- `HuTao-Desktop-Pet-0.5.0-portable.exe`：免安装便携版。
 - `win-unpacked/胡桃桌宠.exe`：未压缩目录版，方便调试。
 
 > 打包会写入应用图标与版本信息，electron-builder 首次需要下载 `winCodeSign`。如果它在无管理员权限的机器上解压失败，可用管理员权限运行一次，或把 `winCodeSign-2.6.0.7z` 解压到 `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\winCodeSign-2.6.0` 后重试（只需 Windows 部分，darwin 软链接报错可以忽略）。安装包没有代码签名，首次运行可能触发 SmartScreen，选择「仍要运行」即可。
@@ -57,10 +57,11 @@ npm run dist       # 打包：安装版 exe + 便携版 exe
 
 ### 互动面板
 
-- 三个标签页：**互动 / B站 / AI**，每个标签独立滚动，不再把养成操作和接口配置混在一起。
+- 四个标签页：**互动 / B站 / AI / QQ**，每个标签独立滚动，不再把养成操作和接口配置混在一起。
 - 互动：亲密度/等级/心情/精力、摸头、休息、每日补给、茶点与礼物。
 - B站：自动逛站开关、免打扰、AI 文案、去逛逛、打开 B 站、最近分享；偏好设置折叠在「偏好设置」里。
-- AI：聊天、AI/观察/语音开关、API Key、观察一下、试音；模型与接口配置折叠在「配置」里。
+- AI：聊天、AI/观察/语音开关、API Key、测试连接、观察一下、试音；模型与接口配置折叠在「配置」里。
+- QQ：开关与连接状态、端口/token/小号、群白名单、说话概率与频率、群聊人设。
 - 分享卡仍然独立展开，不会挤占面板。
 - 面板/分享卡关闭、或渲染层与主进程失同步时，会自动把窗口收回桌宠尺寸，不会留下「宽窗口 + 远处菜单按钮」的残局。
 
@@ -72,9 +73,26 @@ npm run dist       # 打包：安装版 exe + 便携版 exe
 
 ### AI 互动（可选）
 
-- MiniMax 文本对话、TTS 语音回复、小聊天输入框、低频活动窗口观察。
-- 只读取当前活动应用名与窗口标题，不截图、不 OCR、不采集画面。
-- API Key 通过 Electron `safeStorage` 加密保存在 `userData/minimax-api-key.bin`，不会进入仓库。
+胡桃可以聊天、看你在干什么、用语音回你一句话。模型走 **OpenAI 兼容的 `chat/completions` 接口**，不绑定任何一家厂商。
+
+- **默认**：OpenCode（`https://opencode.ai/inference/go/v1`）+ `deepseek-v4.1-flash`，开箱即用。
+- **换模型**：面板里改「接口地址 / 文本模型」即可，DeepSeek、OpenAI、Kimi、GLM、本地 Ollama、LM Studio 都行；点「拉取模型」可以直接从接口读出模型列表。
+- **验证**：「测试连接」会真的发一次对话请求，显示模型、耗时和回的原话，不用等聊天时才发现配置错了。
+- **语音**：默认用 Windows 自带语音合成（System.Speech，默认音色 `Microsoft Huihui Desktop`），点「读取音色」列出本机所有音色，不需要额外 API；不想用就把语音引擎设成「关闭」。
+- **低频观察**：只看当前活动应用名与窗口标题，不截图、不 OCR。
+- **Key 从哪来**：优先级为面板保存的 Key → 环境变量 `HUTAO_API_KEY` / `OPENCODE_API_KEY` / `DEEPSEEK_API_KEY`。面板保存的 Key 用 Electron `safeStorage` 加密存到 `userData/llm-api-key.bin`，不会进入仓库；环境变量的 Key 不落盘。
+- 从 0.4.x 升级：旧的 `minimax-api-key.bin` 会被自动读取并迁移到新文件；本来就在用 MiniMax 的话，把接口地址填回 `https://api.minimaxi.com/v1` 即可。
+
+### QQ 群聊（可选）
+
+胡桃可以挂在一个小号上，在指定群里像人一样说话，而不是见谁都接话：
+
+- **接入方式**：桌宠自带 OneBot 11 反向 WebSocket 服务（默认 `ws://127.0.0.1:6700/ws`），由协议端（SnowLuma / NapCat）把群消息推过来，胡桃的回话也走同一条连接。桌宠本身不登录 QQ。
+- **什么时候说话**：@ 必回；消息里出现「胡桃」按概率回（默认 70%）；普通聊天按概率插一句（默认 8%，同群冷却 4 分钟）；10 分钟最多 4 条；安静时段（默认 01:00–08:00）谁叫都不应。这些数字都能在面板里改。
+- **像人的细节**：回复前按字数算打字延迟（最长 4.6 秒），长回复拆成 1–3 条、条间再等一会儿；自动去掉链接、@全体、Markdown 和思考过程；每个群只保留最近 16 条上下文、10 分钟清空；最近说过的话列在面板里，方便回看。
+- **安全阀**：默认不主动私聊、不发链接、不加好友；没加白名单的群一句话都不说；模型调用失败时回固定台词，不会在群里卡住或复读报错。
+- **怎么装**：见 [docs/qq-setup.md](docs/qq-setup.md)，或跑 `scripts/qq-setup.ps1` 让它把反向 WS 配置写进 SnowLuma。
+- **风险**：第三方协议端不是腾讯官方方案，违反 QQ 用户协议、**有封号风险，务必用小号**。
 
 ### B 站漫游
 
@@ -124,7 +142,8 @@ src/
   shared/                      # 主进程与渲染进程共享的契约（纯 TS，可单测）
     pet.ts                     # 窗口/缩放/面板类型与默认值
     care.ts                    # 养成类型、道具、奖励等级
-    ai.ts                      # AI 设置与回复类型
+    ai.ts                      # 大模型设置、状态、模型/音色列表类型
+    qq.ts                      # QQ 板块设置、状态、群与回复日志类型
     bilibili.ts                # B 站设置/分享类型 + 安静时段纯函数
     normalize.ts               # 所有持久化数据的归一化（脏数据收口）
     format.ts                  # 播放量/时长/截断格式化
@@ -141,15 +160,22 @@ src/
       json-store.ts            # 原子写 JSON（tmp + rename）持久化
       settings-store.ts        # settings.json
       profile-store.ts         # profile.json
-      ai-store.ts              # ai-settings.json + safeStorage Key
+      ai-store.ts              # ai-settings.json + safeStorage 加密的模型 Key
+      qq-store.ts              # qq-settings.json
       bilibili-store.ts        # B 站设置与历史
       bilibili-history.ts      # 历史结构、归一化与容量限制
     services/
       care-service.ts          # 养成逻辑
       ai/
-        minimax-client.ts      # HTTP + 响应解析（可注入 fetch 测试）
-        ai-service.ts          # 对话/观察/试音/B 站推荐语
+        chat-client.ts         # OpenAI 兼容 chat/completions（可注入 fetch 测试）
+        system-tts.ts          # Windows 系统语音合成（System.Speech）
+        ai-service.ts          # 对话/观察/试音/模型列表/连通性测试/B 站推荐语
         desktop-observer.ts    # active-win 低频观察与去重
+      qq/
+        onebot-gateway.ts      # OneBot 11 反向 WS 服务端（token 校验、echo 匹配、心跳）
+        reply-decider.ts       # 该不该说：@ / 名字 / 插话概率 / 冷却 / 频率（纯函数）
+        message-composer.ts    # 消息解析、清洗、拆气泡、打字延迟、群聊 prompt（纯函数）
+        qq-service.ts          # 群白名单、上下文、安静时段、调用模型、发送与记账
       bilibili/
         bilibili-client.ts     # 公开接口抓取、封面下载
         video.ts               # 稿件归一化、URL 白名单（纯函数）
@@ -168,7 +194,7 @@ src/
         mood.ts bubble.ts voice.ts lines.ts   # 表情、气泡、语音、台词
         roam.ts interactions.ts drag.ts        # 漫步、点击、长按/拖拽
         gestures.ts action-rules.ts            # 新动作播放与触发规则
-        care.ts ai.ts bilibili.ts              # 三个功能域
+        care.ts ai.ts bilibili.ts qq.ts         # 四个功能域
         panel.ts panel-views.ts                # 标签面板与分享卡
         passthrough.ts                         # 鼠标穿透（去重，仅状态变化时 IPC）
       styles/                  # base / pet / panel / bilibili
@@ -190,8 +216,10 @@ npm run smoke      # 用仓库内 Electron 跑窗口冒烟测试（含长按回�
 npm run smoke -- --bilibili                                    # 额外抓一条 B 站视频验证网络
 node scripts/run-smoke.cjs --capture tmp/care.png --capture-tab=care
 node scripts/run-smoke.cjs --capture tmp/ai.png --capture-tab=ai
+node scripts/run-smoke.cjs --capture tmp/qq.png --capture-tab=qq
 node scripts/run-smoke.cjs --capture tmp/boo.png --capture-mood=boo
 node scripts/run-smoke.cjs --exe "release/win-unpacked/胡桃桌宠.exe"  # 验证打包后的 exe
+powershell -ExecutionPolicy Bypass -File scripts\qq-setup.ps1 -Uin <小号QQ> -SnowLumaDir 'D:\SnowLuma'
 ```
 
 冒烟测试会使用临时 `userData`，不会污染真实存档；结果写入 `--smoke-result` 指定的 JSON 并打印到终端。检查项包括：窗口创建、renderer 挂载、preload 桥接、透明背景、B 站 IPC、存档落盘、托盘/应用图标、长按窗口尺寸与气泡收起。
@@ -209,8 +237,9 @@ python scripts/process-action-sprites.py
 | --- | --- |
 | `userData/settings.json` | 窗口位置、缩放、置顶、漫步、开机自启 |
 | `userData/profile.json` | 亲密度、等级、背包、每日补给、解锁奖励 |
-| `userData/ai-settings.json` | MiniMax 接口、模型、人设、观察间隔 |
-| `userData/minimax-api-key.bin` | `safeStorage` 加密后的 API Key |
+| `userData/ai-settings.json` | 模型接口地址、模型名、语音引擎与音色、人设、观察间隔 |
+| `userData/llm-api-key.bin` | `safeStorage` 加密后的模型 API Key |
+| `userData/qq-settings.json` | QQ 板块开关、端口、token、小号、群白名单、说话概率与频率 |
 | `userData/bilibili-settings.json` | B 站漫游开关、间隔、安静时段、兴趣关键词 |
 | `userData/bilibili-history.json` | 看过的稿件、分享记录、喜欢/不感兴趣的 UP 主 |
 | `userData/logs/app.log` | 运行日志（超过 1MB 自动轮转） |
@@ -225,6 +254,8 @@ python scripts/process-action-sprites.py
 - 未做登录态 WBI 签名，因此不使用搜索接口，只从热门/排行/分区新稿里挑。
 - 仅针对 Windows x64 打包；代码保留 macOS/Linux 的 Electron 兼容路径，但未验证。
 - 安装包未做代码签名，首次运行可能触发 SmartScreen。
+- QQ 板块依赖第三方协议端（SnowLuma / NapCat），**违反 QQ 用户协议、有封号风险**；只用小号，且协议端版本要跟着 QQ 更新。
+- 语音走 Windows 系统合成，音色取决于本机已安装的 SAPI 音色；非 Windows 平台该功能自动不可用。
 
 ## 参与贡献
 

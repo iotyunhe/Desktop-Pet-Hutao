@@ -59,7 +59,8 @@ body[data-panel-side="right"] .side-panel {
 .panel-tabs {
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 4px;
   padding: 7px 7px 6px;
   border-bottom: 1px solid rgba(126, 54, 40, 0.14);
@@ -366,4 +367,214 @@ body[data-panel-side="right"] .side-panel {
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
+}
+
+.ai-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-inline-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-inline-row .panel-link-button {
+  flex-shrink: 0;
+}
+
+.ai-setting-grid select {
+  height: 25px;
+  padding: 2px 4px;
+  font-size: 10px;
+}
+
+.ai-test-result {
+  margin: 6px 0 0;
+  padding: 5px 7px;
+  border-radius: 8px;
+  background: rgba(255, 241, 230, 0.9);
+  color: rgba(88, 52, 36, 0.9);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.ai-test-result.is-ok {
+  background: rgba(230, 246, 233, 0.95);
+  color: rgba(42, 96, 55, 0.92);
+}
+
+.ai-test-result.is-error {
+  background: rgba(255, 233, 233, 0.95);
+  color: rgba(140, 42, 42, 0.92);
+}
+
+/* ---------- QQ 板块 ---------- */
+
+.qq-section .panel-section-sub {
+  margin: 4px 0 0;
+}
+
+.qq-toggle-row,
+.qq-quick-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.qq-toggle-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.qq-quick-row button {
+  flex-shrink: 0;
+}
+
+.qq-listen-url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(51, 32, 26, 0.62);
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qq-setting-grid {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.qq-setting-grid[hidden] {
+  display: none;
+}
+
+.qq-setting-grid label {
+  display: grid;
+  gap: 3px;
+  color: rgba(51, 32, 26, 0.78);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.qq-setting-grid input[type='number'],
+.qq-setting-grid input[type='text'],
+.qq-setting-grid input[type='password'],
+.qq-setting-grid input[type='time'] {
+  height: 25px;
+  min-height: 25px;
+  padding: 2px 5px;
+  font-size: 10px;
+}
+
+.qq-setting-grid input[type='range'] {
+  width: 100%;
+  height: 18px;
+}
+
+.qq-setting-grid textarea {
+  min-height: 52px;
+  padding: 5px;
+  resize: vertical;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.qq-quiet-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qq-quiet-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.qq-group-block {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(140, 64, 33, 0.2);
+}
+
+.qq-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.qq-group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255, 244, 235, 0.92);
+  color: rgba(74, 44, 32, 0.9);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.qq-group-chip strong {
+  color: rgba(190, 95, 51, 0.95);
+  font-size: 9px;
+}
+
+.qq-group-chip.is-on {
+  background: rgba(255, 226, 209, 0.95);
+}
+
+.qq-group-row input {
+  flex: 1;
+  min-width: 90px;
+  height: 25px;
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.qq-empty {
+  margin: 0;
+  color: rgba(51, 32, 26, 0.6);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.qq-recent {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(140, 64, 33, 0.2);
+  color: rgba(51, 32, 26, 0.66);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.qq-recent-item {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+}
+
+.qq-recent-group {
+  flex-shrink: 0;
+  color: rgba(190, 95, 51, 0.92);
+}
+
+.qq-recent-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

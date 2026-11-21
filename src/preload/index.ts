@@ -1,7 +1,9 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import {
   IPC,
+  type AiConnectionTest,
   type AiMessageRequest,
+  type AiModelList,
   type AiReply,
   type AiSettingsPatch,
   type AiStatus,
@@ -21,7 +23,11 @@ import {
   type PetCareProfile,
   type PetSettings,
   type PetSettingsPatch,
-  type Point
+  type Point,
+  type QqGroupInfo,
+  type QqSettingsPatch,
+  type QqStatus,
+  type TtsVoiceListResult
 } from '../shared';
 
 function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
@@ -49,12 +55,22 @@ const api: HuTaoPetApi = {
   claimDailyCarePack: () => invoke<CareActionResult>(IPC.careClaimDailyPack),
 
   getAiStatus: () => invoke<AiStatus>(IPC.aiGetStatus),
-  saveMiniMaxApiKey: (key: string) => invoke<AiStatus>(IPC.aiSaveKey, key),
-  clearMiniMaxApiKey: () => invoke<AiStatus>(IPC.aiClearKey),
+  saveApiKey: (key: string) => invoke<AiStatus>(IPC.aiSaveKey, key),
+  clearApiKey: () => invoke<AiStatus>(IPC.aiClearKey),
   updateAiSettings: (patch: AiSettingsPatch) => invoke<AiStatus>(IPC.aiUpdateSettings, patch),
   sendAiMessage: (request: AiMessageRequest) => invoke<AiReply>(IPC.aiSendMessage, request),
   observeDesktopNow: () => invoke<AiReply>(IPC.aiObserveDesktop),
   testAiVoice: () => invoke<AiReply>(IPC.aiTestVoice),
+  testAiConnection: () => invoke<AiConnectionTest>(IPC.aiTestConnection),
+  listAiModels: () => invoke<AiModelList>(IPC.aiListModels),
+  listAiVoices: () => invoke<TtsVoiceListResult>(IPC.aiListVoices),
+
+  getQqStatus: () => invoke<QqStatus>(IPC.qqGetStatus),
+  updateQqSettings: (patch: QqSettingsPatch) => invoke<QqStatus>(IPC.qqUpdateSettings, patch),
+  connectQq: () => invoke<QqStatus>(IPC.qqConnect),
+  disconnectQq: () => invoke<QqStatus>(IPC.qqDisconnect),
+  refreshQqGroups: () => invoke<QqGroupInfo[]>(IPC.qqRefreshGroups),
+  onQqStatus: (listener) => subscribe<QqStatus>(IPC.qqStatusEvent, listener),
 
   getBilibiliStatus: () => invoke<BilibiliStatus>(IPC.bilibiliGetStatus),
   updateBilibiliSettings: (patch: BilibiliSettingsPatch) =>

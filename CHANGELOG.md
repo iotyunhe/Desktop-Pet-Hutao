@@ -2,6 +2,37 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)。
 
+## [0.5.0] - 2026-11-21
+
+### Added
+
+- **QQ 群聊板块**：面板新增第 4 个标签「QQ」。桌宠内置 OneBot 11 反向 WebSocket 服务（默认 `ws://127.0.0.1:6700/ws`），配合 SnowLuma / NapCat 让胡桃挂在小号上到指定群里说话。
+  - 说话策略：@ 必回；叫名字按概率回（默认 70%）；普通聊天按概率插话（默认 8%，同群冷却 4 分钟）；10 分钟最多 4 条；安静时段默认 01:00–08:00。全部可在面板里调。
+  - 像人的细节：按字数算打字延迟、长回复拆 1–3 条、清洗链接/@全体/Markdown/思考过程、每群最近 16 条上下文且 10 分钟过期、最近 12 条自发言可回看。
+  - 群白名单（没加的群一律不发言）、token 校验、心跳、自动重连、模型失败兜底台词。
+- 群聊相关纯函数：`reply-decider`（该不该说）、`message-composer`（解析/清洗/拆泡/延迟/prompt），共 10 项单测。
+- 端到端集成测试：真 WebSocket 冒充协议端连上网关，验证「@ 必回」「@ 不受频率上限限制」「白名单外与自己发的消息都不回」，共 69 项测试全绿。
+- `scripts/qq-setup.ps1`：自动把 `name=hutao` 的反向 WS 配置写进 SnowLuma（保留其它配置、写前备份、生成 token）。
+- `docs/qq-setup.md`：接入步骤、规则说明、排障表。
+- 冒烟测试新增 3 条 QQ 检查：网关监听、OneBot API 调用回包、群消息事件送达。
+
+### Changed
+
+- **大模型换成可自由配置的 OpenAI 兼容接口**，不再绑定 MiniMax：
+  - 默认 `https://opencode.ai/inference/go/v1` + `deepseek-v4.1-flash`；面板可改接口地址与模型名，支持「拉取模型」列表和「测试连接」（返回真实耗时与原话）。
+  - 对 `opencode.ai` 自动附加 `x-opencode-session` / `x-opencode-client` 请求头（该网关的路由要求）。
+- **语音改用 Windows 系统合成**（System.Speech），不再依赖厂商 TTS：默认音色 `Microsoft Huihui Desktop`，可「读取音色」列出本机音色，也可设成关闭。
+- API Key 存储从 `minimax-api-key.bin` 改为 `llm-api-key.bin`，并支持环境变量 `HUTAO_API_KEY` / `OPENCODE_API_KEY` / `DEEPSEEK_API_KEY`（环境变量不落盘）；旧文件会被自动读取并迁移。
+- 互动面板标签栏自适应列数，四个标签不会再折行。
+
+### Removed
+
+- `minimax-client.ts`、MiniMax TTS 与 `ttsModel`/`voiceId` 配置项（读取旧配置时自动迁移为 `ttsEngine: 'system'` + 默认音色）。
+
+### Fixed
+
+- `scripts/run-smoke.cjs` 之前只认 `--capture <path>` 的写法，`--capture=<path>` 会被静默忽略导致截图命令不产出文件。
+
 ## [0.4.1] - 2026-10-28
 
 ### Fixed

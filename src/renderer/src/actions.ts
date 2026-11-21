@@ -16,6 +16,7 @@ import {
   updateBilibiliSettingFromInput
 } from './modules/bilibili';
 import { refreshPanel, setPanelTab } from './modules/panel';
+import { handleQqAction, updateQqSettingFromInput, updateQqSettingFromTextArea } from './modules/qq';
 
 function isCareItemId(value: string | undefined): value is CareItemId {
   return Boolean(value && (CARE_ITEM_IDS as string[]).includes(value));
@@ -33,10 +34,18 @@ export function bindPanelInteractions(panel: HTMLElement): void {
     const target = event.target as Element | null;
 
     const tab = target?.closest<HTMLButtonElement>('[data-panel-tab]')?.dataset.panelTab;
-    if (tab === 'care' || tab === 'bilibili' || tab === 'ai') {
+    if (tab === 'care' || tab === 'bilibili' || tab === 'ai' || tab === 'qq') {
       event.preventDefault();
       event.stopPropagation();
       setPanelTab(tab);
+      return;
+    }
+
+    const qqButton = target?.closest<HTMLButtonElement>('[data-qq-action]');
+    if (qqButton?.dataset.qqAction) {
+      event.preventDefault();
+      event.stopPropagation();
+      void handleQqAction(qqButton.dataset.qqAction, qqButton);
       return;
     }
 
@@ -101,6 +110,22 @@ export function bindPanelInteractions(panel: HTMLElement): void {
       return;
     }
 
+    const qqTextarea = target?.closest<HTMLTextAreaElement>('textarea[data-qq-setting]');
+    if (qqTextarea) {
+      event.preventDefault();
+      event.stopPropagation();
+      void updateQqSettingFromTextArea(qqTextarea);
+      return;
+    }
+
+    const qqInput = target?.closest<HTMLInputElement | HTMLSelectElement>('[data-qq-setting]');
+    if (qqInput) {
+      event.preventDefault();
+      event.stopPropagation();
+      void updateQqSettingFromInput(qqInput as HTMLInputElement);
+      return;
+    }
+
     const textarea = target?.closest<HTMLTextAreaElement>('textarea[data-ai-setting]');
     if (textarea) {
       event.preventDefault();
@@ -109,14 +134,14 @@ export function bindPanelInteractions(panel: HTMLElement): void {
       return;
     }
 
-    const input = target?.closest<HTMLInputElement>('input[data-ai-setting]');
+    const input = target?.closest<HTMLInputElement | HTMLSelectElement>('[data-ai-setting]');
     if (!input) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    void updateAiSettingFromInput(input);
+    void updateAiSettingFromInput(input as HTMLInputElement);
   });
 
   panel.addEventListener('submit', (event) => {

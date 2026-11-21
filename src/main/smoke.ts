@@ -2,7 +2,10 @@ import { app, type BrowserWindow } from 'electron';
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import WebSocket from 'ws';
 import { IPC, type BilibiliShare } from '../shared';
+import { OneBotGateway } from './services/qq/onebot-gateway';
+import { noopLogger } from './util/logger';
 
 export interface SmokeCheck {
   name: string;
@@ -494,4 +497,91 @@ export async function captureMoodToFile(
 
   await new Promise((resolve) => setTimeout(resolve, 800));
   await captureWindowToFile(window, filePath);
+}
+
+/**
+ * QQ 板块的通道自检：起一个临时反向 WS 服务，模拟协议端连接、
+ * 验证 token 鉴权、API 调用回包和事件派发都能走通。
+ */
+export async function runQqGatewayProbe(): Promise<SmokeCheck[]> {
+  const checks: SmokeCheck[] = [];
+  const gateway = new OneBotGateway({
+    port: 0,
+    accessToken: 'hutao-probe-token',
+    logger: noopLogger,
+    requestTimeoutMs: 4_000
+  });
+
+  let client: WebSocket | null = null;
+
+  try {
+    await gateway.start();
+    const port = gateway.boundPort;
+    checks.push({ name: 'qq gateway listen', ok: port > 0, detail: `127.0.0.1:${port}` });
+
+    const events: unknown[] = [];
+    gateway.onEvent((event) => events.push(event));
+
+    client = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+      headers: { Authorization: 'Bearer hutao-probe-token' }
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('连接反向 WS 超时')), 4_000);
+      client?.once('open', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      client?.once('error', (error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+    });
+
+    client.on('message', (raw) => {
+      const payload = JSON.parse(String(raw)) as { action?: string; echo?: string };
+      if (payload.action === 'probe_ping' && payload.echo) {
+        client?.send(JSON.stringify({ status: 'ok', retcode: 0, data: { pong: 'yes' }, echo: payload.echo }));
+      }
+    });
+
+    const result = await gateway.call<{ pong?: string }>('probe_ping');
+    checks.push({ name: 'qq gateway api call', ok: result?.pong === 'yes', detail: JSON.stringify(result) });
+
+    client.send(
+      JSON.stringify({
+        post_type: 'message',
+        message_type: 'group',
+        self_id: 10001,
+        group_id: 20002,
+        user_id: 30003,
+        message: [{ type: 'text', data: { text: '胡桃在吗' } }]
+      })
+    );
+
+    const eventOk = await waitFor(() => events.length > 0, 2_000);
+    checks.push({ name: 'qq gateway event', ok: eventOk, detail: JSON.stringify(events[0] ?? null) });
+  } catch (error) {
+    checks.push({ name: 'qq gateway probe', ok: false, detail: error instanceof Error ? error.message : String(error) });
+  } finally {
+    try {
+      client?.close();
+    } catch {
+      // 忽略关闭失败。
+    }
+    await gateway.stop();
+  }
+
+  return checks;
+}
+
+async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return predicate();
 }

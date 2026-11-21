@@ -1,4 +1,15 @@
-import type { BilibiliShare, PanelMode, PanelSide, PetCareProfile, PetSettings, AiStatus, BilibiliStatus, Point } from '../../shared';
+import type {
+  AiConnectionTest,
+  AiStatus,
+  BilibiliShare,
+  BilibiliStatus,
+  PanelMode,
+  PanelSide,
+  PetCareProfile,
+  PetSettings,
+  Point,
+  QqStatus
+} from '../../shared';
 
 export type PetMood =
   | 'idle'
@@ -28,13 +39,14 @@ export type PetMood =
   | 'stretch';
 
 export type BurstKind = 'happy' | 'curious' | 'sleepy';
-export type PanelTab = 'care' | 'bilibili' | 'ai';
+export type PanelTab = 'care' | 'bilibili' | 'ai' | 'qq';
 
 export interface RendererState {
   settings: PetSettings | null;
   careProfile: PetCareProfile | null;
   aiStatus: AiStatus | null;
   bilibiliStatus: BilibiliStatus | null;
+  qqStatus: QqStatus | null;
   panelMode: PanelMode;
   panelSide: PanelSide;
   panelTab: PanelTab;
@@ -48,6 +60,13 @@ export interface RendererState {
   aiBusy: boolean;
   aiConfigOpen: boolean;
   bilibiliConfigOpen: boolean;
+  qqConfigOpen: boolean;
+  /** 「测试连接」的结果，展示在 AI 面板里。 */
+  aiTestResult: AiConnectionTest | null;
+  /** 可用模型列表，点「拉取列表」后填充。 */
+  aiModels: string[];
+  /** 本机可用的系统语音列表。 */
+  aiVoices: string[];
   mood: PetMood;
   dragging: boolean;
   movedDuringDrag: boolean;
@@ -81,6 +100,7 @@ export const state: RendererState = {
   careProfile: null,
   aiStatus: null,
   bilibiliStatus: null,
+  qqStatus: null,
   panelMode: 'none',
   panelSide: 'left',
   panelTab: 'care',
@@ -93,6 +113,10 @@ export const state: RendererState = {
   aiBusy: false,
   aiConfigOpen: false,
   bilibiliConfigOpen: false,
+  qqConfigOpen: false,
+  aiTestResult: null,
+  aiModels: [],
+  aiVoices: [],
   mood: 'idle',
   dragging: false,
   movedDuringDrag: false,

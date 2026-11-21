@@ -5,16 +5,19 @@ import { join } from 'node:path';
 import { IPC, type PetSettings } from '../shared';
 import { registerIpcHandlers } from './ipc/register-ipc';
 import { AiService } from './services/ai/ai-service';
+import { ChatClient } from './services/ai/chat-client';
 import { DesktopObserver } from './services/ai/desktop-observer';
-import { MiniMaxClient } from './services/ai/minimax-client';
+import { SystemTts } from './services/ai/system-tts';
+import { QqService } from './services/qq/qq-service';
 import { BilibiliClient } from './services/bilibili/bilibili-client';
 import { BilibiliService } from './services/bilibili/bilibili-service';
 import { ContentCurator } from './services/bilibili/content-curator';
 import { CareService } from './services/care-service';
-import { runWindowSmokeTest, runLongPressProbe, runPanelLifecycleProbe, runShareCardProbe, captureMoodToFile, captureWindowToFile, openCarePanelForCapture, writeSmokeResult, type SmokeCheck } from './smoke';
-import { AiSettingsStore, MiniMaxKeyStore } from './storage/ai-store';
+import { runWindowSmokeTest, runLongPressProbe, runPanelLifecycleProbe, runQqGatewayProbe, runShareCardProbe, captureMoodToFile, captureWindowToFile, openCarePanelForCapture, writeSmokeResult, type SmokeCheck } from './smoke';
+import { AiSettingsStore, LlmKeyStore } from './storage/ai-store';
 import { BilibiliHistoryStore, BilibiliSettingsStore } from './storage/bilibili-store';
 import { CareProfileStore } from './storage/profile-store';
+import { QqSettingsStore } from './storage/qq-store';
 import { SettingsStore } from './storage/settings-store';
 import { createLogger } from './util/logger';
 import { PetWindowManager } from './window/window-manager';
@@ -76,22 +79,31 @@ async function bootstrap(): Promise<void> {
 
   const aiSettings = new AiSettingsStore(userDataDir);
   aiSettings.load();
-  const keys = new MiniMaxKeyStore(userDataDir);
+  const keys = new LlmKeyStore(() => userDataDir);
+
+  const qqSettings = new QqSettingsStore(userDataDir);
+  qqSettings.load();
 
   const bilibiliSettings = new BilibiliSettingsStore(userDataDir);
   bilibiliSettings.load();
   const bilibiliHistory = new BilibiliHistoryStore(userDataDir);
   bilibiliHistory.load();
 
-  const miniMax = new MiniMaxClient({
+  const chatClient = new ChatClient({
     baseUrl: () => aiSettings.get().apiBaseUrl
   });
   const observer = new DesktopObserver();
   const aiService = new AiService({
     settings: aiSettings,
     keys,
-    client: miniMax,
+    client: chatClient,
     observer,
+    tts: new SystemTts(),
+    logger
+  });
+  const qqService = new QqService({
+    settings: qqSettings,
+    ai: aiService,
     logger
   });
   const careService = new CareService(careProfile);
@@ -158,11 +170,14 @@ async function bootstrap(): Promise<void> {
     settings,
     care: careService,
     ai: aiService,
+    qq: qqService,
     bilibili: bilibiliService,
     tray,
     onSettingsChanged: notifySettingsChanged,
     onQuit: quitApp
   });
+
+  qqService.onStatus((status) => manager?.send(IPC.qqStatusEvent, status));
 
   await manager.create();
   manager.applyLaunchAtLogin();
@@ -173,6 +188,7 @@ async function bootstrap(): Promise<void> {
       { name: 'settings file', ok: existsSync(join(userDataDir, 'settings.json')), detail: userDataDir },
       { name: 'care profile file', ok: existsSync(join(userDataDir, 'profile.json')) },
       { name: 'bilibili settings file', ok: existsSync(join(userDataDir, 'bilibili-settings.json')) },
+      { name: 'qq settings file', ok: existsSync(join(userDataDir, 'qq-settings.json')) },
       { name: 'tray icon', ok: !trayIcon.isEmpty(), detail: resolveTrayIconPath() },
       { name: 'app icon', ok: !nativeImage.createFromPath(resolveAppIconPath()).isEmpty(), detail: resolveAppIconPath() }
     ];
@@ -180,11 +196,13 @@ async function bootstrap(): Promise<void> {
     const panelChecks = await runPanelLifecycleProbe(manager.petWindow!);
     const shareCardChecks = await runShareCardProbe(manager.petWindow!);
     const longPressChecks = await runLongPressProbe(manager.petWindow!);
+    const qqChecks = await runQqGatewayProbe();
     const exitCode = await runWindowSmokeTest(manager.petWindow!, smokeResultPath, [
       ...storeChecks,
       ...panelChecks,
       ...shareCardChecks,
-      ...longPressChecks
+      ...longPressChecks,
+      ...qqChecks
     ]);
 
     if (exitCode === 0 && capturePath && captureMood) {
@@ -238,16 +256,21 @@ async function bootstrap(): Promise<void> {
 
   tray.create();
   bilibiliService.start();
+  if (qqSettings.get().enabled) {
+    void qqService.connect();
+  }
   logger.info('胡桃桌宠启动完成', {
     version: app.getVersion(),
     scale: settings.get().scale,
-    bilibiliEnabled: bilibiliSettings.get().enabled
+    bilibiliEnabled: bilibiliSettings.get().enabled,
+    qqEnabled: qqSettings.get().enabled
   });
 
   app.on('before-quit', () => {
     manager?.markQuitting();
     manager?.savePosition();
     bilibiliService.dispose();
+    void qqService.dispose();
   });
 }
 

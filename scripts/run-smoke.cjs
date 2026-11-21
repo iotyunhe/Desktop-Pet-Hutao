@@ -14,8 +14,14 @@ const root = resolve(__dirname, '..');
 const argv = process.argv.slice(2);
 const exeFlag = argv.indexOf('--exe');
 const packagedExe = exeFlag >= 0 ? resolve(argv[exeFlag + 1] ?? '') : null;
+const captureEqArg = argv.find((arg) => arg.startsWith('--capture='));
 const captureFlag = argv.indexOf('--capture');
-const capturePath = captureFlag >= 0 ? resolve(argv[captureFlag + 1] ?? '') : null;
+const capturePath =
+  captureEqArg !== undefined
+    ? resolve(captureEqArg.slice('--capture='.length))
+    : captureFlag >= 0
+      ? resolve(argv[captureFlag + 1] ?? '')
+      : null;
 const bilibiliSmoke = argv.includes('--bilibili');
 const resultPath = join(tmpdir(), `hutao-smoke-${process.pid}-${Date.now()}.json`);
 

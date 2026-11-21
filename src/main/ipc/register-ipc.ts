@@ -9,10 +9,12 @@ import {
   type CareActionRequest,
   type PanelMode,
   type PetSettingsPatch,
-  type Point
+  type Point,
+  type QqSettingsPatch
 } from '../../shared';
 import type { CareService } from '../services/care-service';
 import type { AiService } from '../services/ai/ai-service';
+import type { QqService } from '../services/qq/qq-service';
 import type { BilibiliService } from '../services/bilibili/bilibili-service';
 import { isBilibiliBvId } from '../services/bilibili/video';
 import type { PetWindowManager } from '../window/window-manager';
@@ -25,6 +27,7 @@ export interface IpcDependencies {
   settings: JsonStore<PetSettings>;
   care: CareService;
   ai: AiService;
+  qq: QqService;
   bilibili: BilibiliService;
   tray: TrayController | null;
   onSettingsChanged: (settings: PetSettings) => void;
@@ -73,6 +76,24 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   ipcMain.handle(IPC.aiObserveDesktop, () => deps.ai.observeDesktop());
 
   ipcMain.handle(IPC.aiTestVoice, () => deps.ai.testVoice());
+
+  ipcMain.handle(IPC.aiTestConnection, () => deps.ai.testConnection());
+
+  ipcMain.handle(IPC.aiListModels, () => deps.ai.listModels());
+
+  ipcMain.handle(IPC.aiListVoices, () => deps.ai.listVoices());
+
+  ipcMain.handle(IPC.qqGetStatus, () => deps.qq.getStatus());
+
+  ipcMain.handle(IPC.qqUpdateSettings, (_event, patch: QqSettingsPatch) => {
+    return deps.qq.updateSettings(patch && typeof patch === 'object' ? patch : {});
+  });
+
+  ipcMain.handle(IPC.qqConnect, () => deps.qq.connect());
+
+  ipcMain.handle(IPC.qqDisconnect, () => deps.qq.disconnect());
+
+  ipcMain.handle(IPC.qqRefreshGroups, () => deps.qq.refreshGroups());
 
   ipcMain.handle(IPC.bilibiliGetStatus, () => deps.bilibili.getStatus());
 

@@ -1,4 +1,11 @@
-import type { AiMessageRequest, AiReply, AiSettingsPatch, AiStatus } from './ai';
+import type {
+  AiConnectionTest,
+  AiMessageRequest,
+  AiModelList,
+  AiReply,
+  AiSettingsPatch,
+  AiStatus
+} from './ai';
 import type {
   BilibiliBrowsingEvent,
   BilibiliBrowseRequest,
@@ -11,6 +18,7 @@ import type {
 } from './bilibili';
 import type { CareActionRequest, CareActionResult, PetCareProfile } from './care';
 import type { PanelLayout, PanelMode, PetSettings, PetSettingsPatch, Point } from './pet';
+import type { QqGroupInfo, QqSettingsPatch, QqStatus } from './qq';
 
 /** 所有 IPC 通道名的唯一来源，main / preload 共用。 */
 export const IPC = {
@@ -29,6 +37,16 @@ export const IPC = {
   aiSendMessage: 'ai:send-message',
   aiObserveDesktop: 'ai:observe-desktop',
   aiTestVoice: 'ai:test-voice',
+  aiTestConnection: 'ai:test-connection',
+  aiListModels: 'ai:list-models',
+  aiListVoices: 'ai:list-voices',
+
+  qqGetStatus: 'qq:get-status',
+  qqUpdateSettings: 'qq:update-settings',
+  qqConnect: 'qq:connect',
+  qqDisconnect: 'qq:disconnect',
+  qqRefreshGroups: 'qq:refresh-groups',
+  qqStatusEvent: 'qq:status',
 
   bilibiliGetStatus: 'bilibili:get-status',
   bilibiliUpdateSettings: 'bilibili:update-settings',
@@ -58,6 +76,12 @@ export type IpcChannel = (typeof IPC)[keyof typeof IPC];
 
 export type Unsubscribe = () => void;
 
+export interface TtsVoiceListResult {
+  ok: boolean;
+  voices: string[];
+  error?: string;
+}
+
 /** 渲染进程可见的完整桌宠 API，由 preload 通过 contextBridge 注入。 */
 export interface HuTaoPetApi {
   getSettings: () => Promise<PetSettings>;
@@ -69,12 +93,22 @@ export interface HuTaoPetApi {
   claimDailyCarePack: () => Promise<CareActionResult>;
 
   getAiStatus: () => Promise<AiStatus>;
-  saveMiniMaxApiKey: (key: string) => Promise<AiStatus>;
-  clearMiniMaxApiKey: () => Promise<AiStatus>;
+  saveApiKey: (key: string) => Promise<AiStatus>;
+  clearApiKey: () => Promise<AiStatus>;
   updateAiSettings: (patch: AiSettingsPatch) => Promise<AiStatus>;
   sendAiMessage: (request: AiMessageRequest) => Promise<AiReply>;
   observeDesktopNow: () => Promise<AiReply>;
   testAiVoice: () => Promise<AiReply>;
+  testAiConnection: () => Promise<AiConnectionTest>;
+  listAiModels: () => Promise<AiModelList>;
+  listAiVoices: () => Promise<TtsVoiceListResult>;
+
+  getQqStatus: () => Promise<QqStatus>;
+  updateQqSettings: (patch: QqSettingsPatch) => Promise<QqStatus>;
+  connectQq: () => Promise<QqStatus>;
+  disconnectQq: () => Promise<QqStatus>;
+  refreshQqGroups: () => Promise<QqGroupInfo[]>;
+  onQqStatus: (listener: (status: QqStatus) => void) => Unsubscribe;
 
   getBilibiliStatus: () => Promise<BilibiliStatus>;
   updateBilibiliSettings: (patch: BilibiliSettingsPatch) => Promise<BilibiliStatus>;

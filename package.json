@@ -1,6 +1,6 @@
 {
   "name": "hutao-desktop-pet",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "description": "A 2D Hu Tao desktop pet built with Electron, now with a Bilibili wandering companion.",
   "type": "module",
@@ -24,6 +24,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "latest",
+    "@types/ws": "^8.5.0",
     "electron": "latest",
     "electron-builder": "^26.8.1",
     "electron-vite": "latest",
@@ -31,6 +32,7 @@
     "vite": "latest"
   },
   "dependencies": {
-    "active-win": "^8.2.1"
+    "active-win": "^8.2.1",
+    "ws": "^8.18.0"
   }
 }

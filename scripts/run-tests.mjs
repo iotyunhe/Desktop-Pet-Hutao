@@ -33,6 +33,9 @@ for (const file of files) {
     target: 'node22',
     sourcemap: 'inline',
     logLevel: 'warning',
+    // node_modules 保持外部依赖：ws 之类的 CJS 包被 esbuild 内联成 ESM 后
+    // 会触发「Dynamic require of "stream" is not supported」。
+    packages: 'external',
     external: ['electron']
   });
   outputs.push(outfile);

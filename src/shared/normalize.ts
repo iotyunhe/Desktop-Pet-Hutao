@@ -1,10 +1,12 @@
 import {
   AI_PERSONA_TEXT_LIMIT,
   DEFAULT_AI_SETTINGS,
-  LEGACY_MINIMAX_API_BASE_URL,
+  DEFAULT_TTS_VOICE,
+  LEGACY_MINIMAX_API_HOSTS,
   MAX_AI_OBSERVE_INTERVAL_MINUTES,
   MIN_AI_OBSERVE_INTERVAL_MINUTES,
-  type AiSettings
+  type AiSettings,
+  type TtsEngine
 } from './ai';
 import {
   DEFAULT_BILIBILI_INTERESTS,
@@ -27,6 +29,13 @@ import {
   type CareRewardId,
   type PetCareProfile
 } from './care';
+import {
+  DEFAULT_QQ_SETTINGS,
+  MAX_QQ_GROUPS,
+  MAX_QQ_PORT,
+  MIN_QQ_PORT,
+  type QqSettings
+} from './qq';
 import {
   DEFAULT_SETTINGS,
   MAX_SCALE,
@@ -127,7 +136,8 @@ export function normalizeApiBaseUrl(value: unknown): string {
       nextUrl = `${nextUrl}/v1`;
     }
 
-    if (nextUrl === LEGACY_MINIMAX_API_BASE_URL) {
+    // 老版本写死过 MiniMax 的端点，迁移时直接回落到新的默认接口。
+    if (LEGACY_MINIMAX_API_HOSTS.includes(url.hostname)) {
       return DEFAULT_AI_SETTINGS.apiBaseUrl;
     }
 
@@ -160,10 +170,14 @@ export function normalizeAiSettings(value: unknown): AiSettings {
     voiceEnabled: Boolean(merged.voiceEnabled),
     apiBaseUrl: normalizeApiBaseUrl(merged.apiBaseUrl),
     textModel: normalizeShortText(merged.textModel, DEFAULT_AI_SETTINGS.textModel, 80),
-    ttsModel: normalizeShortText(merged.ttsModel, DEFAULT_AI_SETTINGS.ttsModel, 80),
-    voiceId: normalizeShortText(merged.voiceId, DEFAULT_AI_SETTINGS.voiceId, 80),
+    ttsEngine: normalizeTtsEngine(merged.ttsEngine),
+    ttsVoice: normalizeShortText(merged.ttsVoice, DEFAULT_TTS_VOICE, 80),
     persona: normalizePersona(merged.persona)
   };
+}
+
+function normalizeTtsEngine(value: unknown): TtsEngine {
+  return value === 'off' ? 'off' : 'system';
 }
 
 function normalizeShortText(value: unknown, fallback: string, limit: number): string {
@@ -227,5 +241,72 @@ export function normalizeBilibiliSettings(value: unknown): BilibiliSettings {
     interests: normalizeBilibiliInterests(merged.interests),
     allowLongVideos: Boolean(merged.allowLongVideos),
     aiCommentary: Boolean(merged.aiCommentary)
+  };
+}
+
+function normalizePercent(value: unknown, fallback: number): number {
+  return Math.round(clamp(finiteNumber(value, fallback), 0, 100));
+}
+
+export function normalizeQqGroups(value: unknown): number[] {
+  const rawList = Array.isArray(value) ? value : [];
+  const seen = new Set<number>();
+  const groups: number[] = [];
+
+  for (const item of rawList) {
+    const groupId = Math.round(finiteNumber(item, 0));
+    if (groupId <= 0 || seen.has(groupId)) {
+      continue;
+    }
+
+    seen.add(groupId);
+    groups.push(groupId);
+
+    if (groups.length >= MAX_QQ_GROUPS) {
+      break;
+    }
+  }
+
+  return groups;
+}
+
+export function normalizeQqSettings(value: unknown): QqSettings {
+  const raw = value && typeof value === 'object' ? (value as Partial<QqSettings>) : {};
+  const merged = { ...DEFAULT_QQ_SETTINGS, ...raw };
+  const quietHoursStart =
+    parseClockToMinutes(String(merged.quietHoursStart)) === null
+      ? DEFAULT_QQ_SETTINGS.quietHoursStart
+      : String(merged.quietHoursStart);
+  const quietHoursEnd =
+    parseClockToMinutes(String(merged.quietHoursEnd)) === null
+      ? DEFAULT_QQ_SETTINGS.quietHoursEnd
+      : String(merged.quietHoursEnd);
+  const selfQq = typeof merged.selfQq === 'string' ? merged.selfQq.replace(/\D/g, '').slice(0, 12) : '';
+  const accessToken = typeof merged.accessToken === 'string' ? merged.accessToken.trim().slice(0, 200) : '';
+  const persona = typeof merged.persona === 'string' ? merged.persona.replace(/\s+/g, ' ').trim().slice(0, AI_PERSONA_TEXT_LIMIT) : '';
+
+  return {
+    enabled: Boolean(merged.enabled),
+    wsPort: Math.round(clamp(finiteNumber(merged.wsPort, DEFAULT_QQ_SETTINGS.wsPort), MIN_QQ_PORT, MAX_QQ_PORT)),
+    accessToken,
+    selfQq,
+    allowedGroups: normalizeQqGroups(merged.allowedGroups),
+    replyToAt: Boolean(merged.replyToAt),
+    nameReplyChance: normalizePercent(merged.nameReplyChance, DEFAULT_QQ_SETTINGS.nameReplyChance),
+    interjectChance: normalizePercent(merged.interjectChance, DEFAULT_QQ_SETTINGS.interjectChance),
+    interjectCooldownMinutes: Math.round(
+      clamp(
+        finiteNumber(merged.interjectCooldownMinutes, DEFAULT_QQ_SETTINGS.interjectCooldownMinutes),
+        1,
+        60
+      )
+    ),
+    maxRepliesPer10Minutes: Math.round(
+      clamp(finiteNumber(merged.maxRepliesPer10Minutes, DEFAULT_QQ_SETTINGS.maxRepliesPer10Minutes), 1, 20)
+    ),
+    quietHoursEnabled: Boolean(merged.quietHoursEnabled),
+    quietHoursStart,
+    quietHoursEnd,
+    persona
   };
 }

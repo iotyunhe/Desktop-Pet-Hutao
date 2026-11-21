@@ -73,7 +73,9 @@ export async function updateAiSettingFromInput(input: HTMLInputElement): Promise
     patch[setting] = input.checked;
   } else if (setting === 'observeIntervalMinutes') {
     patch.observeIntervalMinutes = Number(input.value);
-  } else if (setting === 'apiBaseUrl' || setting === 'textModel' || setting === 'ttsModel' || setting === 'voiceId') {
+  } else if (setting === 'ttsEngine') {
+    patch.ttsEngine = input.value === 'off' ? 'off' : 'system';
+  } else if (setting === 'apiBaseUrl' || setting === 'textModel' || setting === 'ttsVoice') {
     patch[setting] = input.value;
   }
 
@@ -114,21 +116,52 @@ export async function handleAiAction(action: string): Promise<void> {
   try {
     if (action === 'save-key') {
       if (!pendingKey) {
-        showBubble('先粘贴新的 MiniMax API Key。', 2600);
+        showBubble('先粘贴模型服务的 API Key。', 2600);
         return;
       }
 
-      state.aiStatus = await api.saveMiniMaxApiKey(pendingKey);
+      state.aiStatus = await api.saveApiKey(pendingKey);
       state.aiConfigOpen = false;
-      showBubble(state.aiStatus.hasApiKey ? 'MiniMax API Key 已安全保存。' : '保存失败，请稍后重试。', 3000);
+      state.aiTestResult = null;
+      showBubble(state.aiStatus.hasApiKey ? 'API Key 已安全保存。' : '保存失败，请稍后重试。', 3000);
       scheduleAiObservation(AI_OBSERVE_INITIAL_DELAY_MS);
       return;
     }
 
     if (action === 'clear-key') {
-      state.aiStatus = await api.clearMiniMaxApiKey();
-      showBubble('MiniMax API Key 已清除。', 2600);
+      state.aiStatus = await api.clearApiKey();
+      state.aiTestResult = null;
+      showBubble('API Key 已清除。', 2600);
       scheduleAiObservation();
+      return;
+    }
+
+    if (action === 'test-connection') {
+      const result = await api.testAiConnection();
+      state.aiTestResult = result;
+      showBubble(
+        result.ok ? `连上了，${result.model} 用了 ${result.latencyMs}ms。` : (result.error ?? '连接失败'),
+        3600
+      );
+      await refreshAiStatus();
+      return;
+    }
+
+    if (action === 'list-models') {
+      const result = await api.listAiModels();
+      state.aiModels = result.models;
+      if (!result.ok) {
+        showBubble(result.error ?? '拉不到模型列表。', 3200);
+      } else {
+        showBubble(`这个接口有 ${result.models.length} 个模型可选。`, 3000);
+      }
+      return;
+    }
+
+    if (action === 'list-voices') {
+      const result = await api.listAiVoices();
+      state.aiVoices = result.voices;
+      showBubble(result.ok ? `本机有 ${result.voices.length} 个语音` : (result.error ?? '读不到语音列表'), 3000);
       return;
     }
 

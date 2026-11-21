@@ -10,7 +10,8 @@ import {
   type BilibiliStatus,
   type CareActionType,
   type CareItemId,
-  type PetCareProfile
+  type PetCareProfile,
+  type QqStatus
 } from '../../../shared';
 import { escapeHtml } from '../dom';
 import type { PanelTab, RendererState } from '../state';
@@ -31,12 +32,12 @@ function getAiStatusText(status: AiStatus | null): string {
     return 'AI 状态读取中。';
   }
 
-  if (!status.encryptionAvailable) {
+  if (!status.encryptionAvailable && status.keySource !== 'environment') {
     return '当前系统无法安全保存 API Key。';
   }
 
   if (!status.hasApiKey) {
-    return '请保存新的 MiniMax API Key。';
+    return '还没配置模型的 API Key。';
   }
 
   if (!status.settings.enabled) {
@@ -131,7 +132,15 @@ function renderAiSection(state: RendererState): string {
 
   const chatDisabled = state.aiBusy || !settings.enabled;
   const apiDisabled = state.aiBusy || !settings.enabled || !status?.hasApiKey;
-  const keyPlaceholder = status?.hasApiKey ? '已保存，需要替换时粘贴新 key' : '粘贴新的 MiniMax API Key';
+  const keyPlaceholder =
+    status?.keySource === 'environment'
+      ? '正在用环境变量里的 key'
+      : status?.hasApiKey
+        ? '已保存，需要替换时粘贴新 key'
+        : '粘贴模型服务的 API Key';
+  const modelOptions = state.aiModels.map((model) => `<option value="${escapeHtml(model)}"></option>`).join('');
+  const voiceOptions = state.aiVoices.map((voice) => `<option value="${escapeHtml(voice)}"></option>`).join('');
+  const testResult = state.aiTestResult;
 
   return `
     <div class="ai-section panel-tab-content">
@@ -151,20 +160,199 @@ function renderAiSection(state: RendererState): string {
       <div class="ai-key-row">
         <input class="ai-key-input" type="password" autocomplete="off" placeholder="${keyPlaceholder}" ${status?.encryptionAvailable ? '' : 'disabled'}>
         <button type="button" data-ai-action="save-key" ${status?.encryptionAvailable ? '' : 'disabled'}>保存</button>
-        <button type="button" data-ai-action="clear-key" ${status?.hasApiKey ? '' : 'disabled'}>清除</button>
+        <button type="button" data-ai-action="clear-key" ${status?.keySource === 'stored' ? '' : 'disabled'}>清除</button>
       </div>
       <div class="ai-quick-row">
         <button class="ai-observe-button" type="button" data-ai-action="observe" ${apiDisabled ? 'disabled' : ''}>观察一下</button>
         <button class="ai-voice-test-button" type="button" data-ai-action="test-voice" ${apiDisabled ? 'disabled' : ''}>试音</button>
+        <button class="ai-test-button" type="button" data-ai-action="test-connection" ${apiDisabled ? 'disabled' : ''}>测试连接</button>
         <button class="ai-config-button" type="button" data-ai-action="toggle-config" aria-expanded="${state.aiConfigOpen}">${state.aiConfigOpen ? '收起' : '配置'}</button>
       </div>
+      ${
+        testResult
+          ? `<p class="ai-test-result${testResult.ok ? ' is-ok' : ' is-error'}">${
+              testResult.ok
+                ? `连接正常：${escapeHtml(testResult.model)} · ${testResult.latencyMs}ms · ${escapeHtml(testResult.reply)}`
+                : escapeHtml(testResult.error ?? '连接失败')
+            }</p>`
+          : ''
+      }
       <div class="ai-setting-grid" ${state.aiConfigOpen ? '' : 'hidden'}>
-        <label>间隔<input type="number" min="5" max="30" step="1" data-ai-setting="observeIntervalMinutes" value="${settings.observeIntervalMinutes}"></label>
-        <label>接口<input type="text" data-ai-setting="apiBaseUrl" value="${escapeHtml(settings.apiBaseUrl)}"></label>
-        <label>文本<input type="text" data-ai-setting="textModel" value="${escapeHtml(settings.textModel)}"></label>
-        <label>语音<input type="text" data-ai-setting="voiceId" value="${escapeHtml(settings.voiceId)}"></label>
+        <label>观察间隔（分钟）<input type="number" min="5" max="30" step="1" data-ai-setting="observeIntervalMinutes" value="${settings.observeIntervalMinutes}"></label>
+        <label>接口地址<input type="text" data-ai-setting="apiBaseUrl" value="${escapeHtml(settings.apiBaseUrl)}"></label>
+        <label>文本模型
+          <span class="ai-inline-row">
+            <input type="text" class="ai-model-input" list="ai-model-list" data-ai-setting="textModel" value="${escapeHtml(settings.textModel)}">
+            <button type="button" class="panel-link-button" data-ai-action="list-models" ${apiDisabled ? 'disabled' : ''}>拉取模型</button>
+          </span>
+        </label>
+        <label>语音引擎
+          <select data-ai-setting="ttsEngine">
+            <option value="system" ${settings.ttsEngine === 'system' ? 'selected' : ''}>系统语音（离线）</option>
+            <option value="off" ${settings.ttsEngine === 'off' ? 'selected' : ''}>不发声</option>
+          </select>
+        </label>
+        <label>音色
+          <span class="ai-inline-row">
+            <input type="text" class="ai-voice-input" list="ai-voice-list" data-ai-setting="ttsVoice" value="${escapeHtml(settings.ttsVoice)}">
+            <button type="button" class="panel-link-button" data-ai-action="list-voices">读取音色</button>
+          </span>
+        </label>
         <label>人设<textarea maxlength="500" rows="4" data-ai-setting="persona">${escapeHtml(settings.persona)}</textarea></label>
       </div>
+      <datalist id="ai-model-list">${modelOptions}</datalist>
+      <datalist id="ai-voice-list">${voiceOptions}</datalist>
+    </div>
+  `;
+}
+
+function getQqStatusText(status: QqStatus | null): string {
+  if (!status) {
+    return 'QQ 状态读取中。';
+  }
+
+  if (!status.settings.enabled) {
+    return 'QQ 板块已关闭。';
+  }
+
+  if (status.state === 'online') {
+    return status.botNickname ? `已上线：${status.botNickname}` : '已经连上协议端了。';
+  }
+
+  if (status.state === 'connecting') {
+    return `等协议端连 ${status.listenUrl}`;
+  }
+
+  if (status.state === 'error') {
+    return status.lastError ?? '连接出错了。';
+  }
+
+  return '还没启动。';
+}
+
+function renderQqGroups(state: RendererState): string {
+  const status = state.qqStatus;
+  const allowed = status?.settings.allowedGroups ?? [];
+  const groups = status?.groups ?? [];
+
+  const known = groups
+    .map((group) => {
+      const inList = allowed.includes(group.groupId);
+      return `
+        <button type="button" class="qq-group-chip${inList ? ' is-on' : ''}" data-qq-action="${inList ? 'remove-group' : 'add-group'}" data-group-id="${group.groupId}">
+          <span>${escapeHtml(truncateText(group.groupName || String(group.groupId), 12))}</span>
+          <strong>${inList ? '已加' : '加入'}</strong>
+        </button>
+      `;
+    })
+    .join('');
+
+  const onlySaved = allowed
+    .filter((groupId) => !groups.some((group) => group.groupId === groupId))
+    .map(
+      (groupId) => `
+        <button type="button" class="qq-group-chip is-on" data-qq-action="remove-group" data-group-id="${groupId}">
+          <span>${groupId}</span>
+          <strong>已加</strong>
+        </button>
+      `
+    )
+    .join('');
+
+  const groupList = known || onlySaved ? known + onlySaved : '<p class="qq-empty">还没加到白名单，胡桃不会在群里说话。</p>';
+
+  return `
+    <div class="qq-group-block">
+      <div class="panel-section-head">
+        <strong>在哪些群聊天</strong>
+        <button type="button" class="panel-link-button" data-qq-action="refresh-groups">刷新群列表</button>
+      </div>
+      <div class="qq-group-row">${groupList}</div>
+      <div class="qq-group-row">
+        <input class="qq-group-input" type="text" inputmode="numeric" placeholder="也可以手填群号">
+        <button type="button" data-qq-action="add-group-manual">加入</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderQqReplies(status: QqStatus | null): string {
+  const replies = status?.recentReplies.slice(0, 3) ?? [];
+  if (replies.length === 0) {
+    return '';
+  }
+
+  return `
+    <div class="qq-recent">
+      <span>最近说过</span>
+      ${replies
+        .map(
+          (reply) => `
+            <div class="qq-recent-item">
+              <span class="qq-recent-group">${escapeHtml(truncateText(reply.groupName || String(reply.groupId), 10))}</span>
+              <span class="qq-recent-text">${escapeHtml(reply.text)}</span>
+            </div>
+          `
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+function renderQqSection(state: RendererState): string {
+  const status = state.qqStatus;
+  const settings = status?.settings;
+
+  if (!settings) {
+    return `
+      <div class="qq-section panel-tab-content">
+        <div class="panel-section-head"><strong>QQ 群聊</strong></div>
+        <p class="panel-section-sub">QQ 状态读取中。</p>
+      </div>
+    `;
+  }
+
+  const online = status?.state === 'online';
+
+  return `
+    <div class="qq-section panel-tab-content">
+      <div class="panel-section-head">
+        <strong>QQ 群聊</strong>
+        <button type="button" class="panel-link-button" data-qq-action="toggle-config" aria-expanded="${state.qqConfigOpen}">${state.qqConfigOpen ? '收起配置' : '配置'}</button>
+      </div>
+      <p class="panel-section-sub">${escapeHtml(getQqStatusText(status))}</p>
+      <div class="qq-toggle-row">
+        <label><input type="checkbox" data-qq-setting="enabled" ${settings.enabled ? 'checked' : ''}>开启</label>
+        <label><input type="checkbox" data-qq-setting="replyToAt" ${settings.replyToAt ? 'checked' : ''}>@ 必回</label>
+        <label><input type="checkbox" data-qq-setting="quietHoursEnabled" ${settings.quietHoursEnabled ? 'checked' : ''}>免打扰</label>
+      </div>
+      <div class="qq-quick-row">
+        <button type="button" data-qq-action="connect" ${!settings.enabled || online ? 'disabled' : ''}>连接</button>
+        <button type="button" data-qq-action="disconnect" ${online ? '' : 'disabled'}>断开</button>
+        <span class="qq-listen-url">${escapeHtml(status?.listenUrl ?? '')}</span>
+      </div>
+      <div class="qq-setting-grid" ${state.qqConfigOpen ? '' : 'hidden'}>
+        <label>监听端口<input type="number" min="1024" max="65535" step="1" data-qq-setting="wsPort" value="${settings.wsPort}"></label>
+        <label>小号 QQ<input type="text" inputmode="numeric" maxlength="12" data-qq-setting="selfQq" value="${escapeHtml(settings.selfQq)}"></label>
+        <label>访问 token<input type="password" autocomplete="off" data-qq-setting="accessToken" value="${escapeHtml(settings.accessToken)}"></label>
+        <label>叫名字时回复 ${settings.nameReplyChance}%<input type="range" min="0" max="100" step="5" data-qq-setting="nameReplyChance" value="${settings.nameReplyChance}"></label>
+        <label>主动插话 ${settings.interjectChance}%<input type="range" min="0" max="40" step="1" data-qq-setting="interjectChance" value="${settings.interjectChance}"></label>
+        <label>同群冷却（分钟）<input type="number" min="1" max="60" step="1" data-qq-setting="interjectCooldownMinutes" value="${settings.interjectCooldownMinutes}"></label>
+        <label>10 分钟最多<input type="number" min="1" max="20" step="1" data-qq-setting="maxRepliesPer10Minutes" value="${settings.maxRepliesPer10Minutes}"></label>
+        <label>安静时段
+          <span class="qq-quiet-row">
+            <input type="time" data-qq-setting="quietHoursStart" value="${settings.quietHoursStart}">
+            <span>至</span>
+            <input type="time" data-qq-setting="quietHoursEnd" value="${settings.quietHoursEnd}">
+          </span>
+        </label>
+        <label>群聊人设<textarea maxlength="500" rows="3" data-qq-setting="persona" placeholder="留空就沿用 AI 面板里的胡桃人设">${escapeHtml(
+          settings.persona
+        )}</textarea></label>
+      </div>
+      ${renderQqGroups(state)}
+      ${renderQqReplies(status)}
+      <p class="panel-hint">今天已说 ${status?.todayReplies ?? 0} 句。协议端（SnowLuma）要先连到上面的地址，胡桃才收得到消息。</p>
     </div>
   `;
 }
@@ -267,13 +455,16 @@ export function renderCarePanel(state: RendererState): string {
       ? `${renderCareSection(state.careProfile)}<p class="panel-hint">小提示：10 秒内连摸 3 次头，会有惊喜。</p>`
       : state.panelTab === 'bilibili'
         ? renderBilibiliSection(state)
-        : renderAiSection(state);
+        : state.panelTab === 'qq'
+          ? renderQqSection(state)
+          : renderAiSection(state);
 
   return `
     <div class="panel-tabs" role="tablist" aria-label="胡桃面板">
       ${renderTabButton(state, 'care', '互动')}
       ${renderTabButton(state, 'bilibili', 'B站')}
       ${renderTabButton(state, 'ai', 'AI')}
+      ${renderTabButton(state, 'qq', 'QQ')}
     </div>
     <div class="panel-body" role="tabpanel">
       ${content}
