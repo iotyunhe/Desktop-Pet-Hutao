@@ -1,12 +1,16 @@
 import {
   AI_PERSONA_TEXT_LIMIT,
   DEFAULT_AI_SETTINGS,
+  DEFAULT_TTS_API_URL,
   DEFAULT_TTS_VOICE,
   LEGACY_MINIMAX_API_HOSTS,
   MAX_AI_OBSERVE_INTERVAL_MINUTES,
   MIN_AI_OBSERVE_INTERVAL_MINUTES,
+  TTS_LANG_OPTIONS,
+  TTS_PROMPT_TEXT_LIMIT,
   type AiSettings,
-  type TtsEngine
+  type TtsEngine,
+  type TtsLang
 } from './ai';
 import {
   DEFAULT_BILIBILI_INTERESTS,
@@ -197,12 +201,49 @@ export function normalizeAiSettings(value: unknown): AiSettings {
     textModel,
     ttsEngine: normalizeTtsEngine(merged.ttsEngine),
     ttsVoice: normalizeShortText(merged.ttsVoice, DEFAULT_TTS_VOICE, 80),
+    ttsApiUrl: normalizeTtsApiUrl(merged.ttsApiUrl),
+    ttsRefAudio: normalizeShortText(merged.ttsRefAudio, '', 260),
+    ttsPromptText: normalizeShortText(merged.ttsPromptText, '', TTS_PROMPT_TEXT_LIMIT),
+    ttsPromptLang: normalizeTtsLang(merged.ttsPromptLang),
+    ttsTextLang: normalizeTtsLang(merged.ttsTextLang),
     persona: normalizePersona(merged.persona)
   };
 }
 
 function normalizeTtsEngine(value: unknown): TtsEngine {
-  return value === 'off' ? 'off' : 'system';
+  if (value === 'off') {
+    return 'off';
+  }
+  if (value === 'clone') {
+    return 'clone';
+  }
+  return 'system';
+}
+
+function normalizeTtsLang(value: unknown): TtsLang {
+  const lang = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  const found = TTS_LANG_OPTIONS.find((option) => option.value === lang);
+  return found ? found.value : DEFAULT_AI_SETTINGS.ttsPromptLang;
+}
+
+/** 克隆音色接口地址：只接受 http(s)，去掉尾部斜杠，不强行补 /v1。 */
+export function normalizeTtsApiUrl(value: unknown): string {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) {
+    return DEFAULT_TTS_API_URL;
+  }
+  try {
+    const url = new URL(text);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return DEFAULT_TTS_API_URL;
+    }
+    url.hash = '';
+    url.search = '';
+    const next = url.toString().replace(/\/+$/, '');
+    return next || DEFAULT_TTS_API_URL;
+  } catch {
+    return DEFAULT_TTS_API_URL;
+  }
 }
 
 function normalizeShortText(value: unknown, fallback: string, limit: number): string {

@@ -73,6 +73,7 @@ const api: HuTaoPetApi = {
   testAiConnection: () => invoke<AiConnectionTest>(IPC.aiTestConnection),
   listAiModels: () => invoke<AiModelList>(IPC.aiListModels),
   listAiVoices: () => invoke<TtsVoiceListResult>(IPC.aiListVoices),
+  probeCloneVoice: () => invoke<AiReply>(IPC.aiProbeCloneVoice),
 
   getQqStatus: () => invoke<QqStatus>(IPC.qqGetStatus),
   updateQqSettings: (patch: QqSettingsPatch) => invoke<QqStatus>(IPC.qqUpdateSettings, patch),

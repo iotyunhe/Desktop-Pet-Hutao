@@ -1,11 +1,12 @@
-import type { AiReply, AiSettings, AiSettingsPatch } from '../../../shared';
+import { TTS_LANG_OPTIONS, type AiReply, type AiSettings, type AiSettingsPatch, type TtsLang } from '../../../shared';
 import { requireApi } from '../api';
 import { AI_OBSERVE_INITIAL_DELAY_MS, AI_OBSERVE_MIN_IDLE_MS } from '../constants';
 import { state } from '../state';
 import { showBubble, showBurst } from './bubble';
 import { setTemporaryMood } from './mood';
 import { refreshPanel } from './panel';
-import { noteInteraction, stopRoam } from './roam';import { playReplyVoice } from './voice';
+import { noteInteraction, stopRoam } from './roam';
+import { playReplyVoice } from './voice';
 
 export function showAiReply(reply: AiReply, silentFailure = false): void {
   if (!reply.ok && silentFailure) {
@@ -62,8 +63,12 @@ async function runAutomaticObservation(): Promise<void> {
   scheduleAiObservation();
 }
 
-export async function updateAiSettingFromInput(input: HTMLInputElement): Promise<void> {
-  const setting = input.dataset.aiSetting as keyof AiSettings | undefined;
+function normalizeTtsLang(value: string): TtsLang {
+  const found = TTS_LANG_OPTIONS.find((option) => option.value === value);
+  return found ? found.value : 'zh';
+}
+
+export async function updateAiSettingFromInput(input: HTMLInputElement): Promise<void> {  const setting = input.dataset.aiSetting as keyof AiSettings | undefined;
   if (!setting) {
     return;
   }
@@ -74,9 +79,11 @@ export async function updateAiSettingFromInput(input: HTMLInputElement): Promise
   } else if (setting === 'observeIntervalMinutes') {
     patch.observeIntervalMinutes = Number(input.value);
   } else if (setting === 'ttsEngine') {
-    patch.ttsEngine = input.value === 'off' ? 'off' : 'system';
-  } else if (setting === 'apiBaseUrl' || setting === 'textModel' || setting === 'ttsVoice') {
+    patch.ttsEngine = input.value === 'off' ? 'off' : input.value === 'clone' ? 'clone' : 'system';
+  } else if (setting === 'apiBaseUrl' || setting === 'textModel' || setting === 'ttsVoice' || setting === 'ttsApiUrl' || setting === 'ttsRefAudio' || setting === 'ttsPromptText') {
     patch[setting] = input.value;
+  } else if (setting === 'ttsPromptLang' || setting === 'ttsTextLang') {
+    patch[setting] = normalizeTtsLang(input.value);
   }
 
   state.aiStatus = await requireApi().updateAiSettings(patch);
@@ -176,6 +183,13 @@ export async function handleAiAction(action: string): Promise<void> {
     if (action === 'test-voice') {
       const reply = await api.testAiVoice();
       showAiReply(reply);
+      await refreshAiStatus();
+      return;
+    }
+
+    if (action === 'probe-clone') {
+      const reply = await api.probeCloneVoice();
+      showBubble(reply.text, reply.ok ? 3600 : 4200);
       await refreshAiStatus();
     }
   } finally {

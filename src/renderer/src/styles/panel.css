@@ -307,9 +307,13 @@ body[data-panel-side="right"] .side-panel {
 
 .ai-quick-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px 48px;
-  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 8px;
   margin-top: 5px;
+}
+
+.ai-quick-row button {
+  white-space: nowrap;
 }
 
 .ai-key-input,

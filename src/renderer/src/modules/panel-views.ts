@@ -2,6 +2,8 @@ import {
   CARE_ITEM_LABELS,
   FEED_ITEM_IDS,
   GIFT_ITEM_IDS,
+  TTS_LANG_OPTIONS,
+  TTS_REF_AUDIO_HINT,
   formatDuration,
   formatViewCount,
   truncateText,
@@ -12,10 +14,18 @@ import {
   type CareActionType,
   type CareItemId,
   type PetCareProfile,
-  type QqStatus
+  type QqStatus,
+  type TtsLang
 } from '../../../shared';
 import { escapeHtml } from '../dom';
 import type { PanelTab, RendererState } from '../state';
+
+function renderTtsLangOptions(selected: TtsLang): string {
+  return TTS_LANG_OPTIONS.map(
+    (option) =>
+      `<option value="${option.value}" ${option.value === selected ? 'selected' : ''}>${option.label}</option>`
+  ).join('');
+}
 
 function renderTabButton(state: RendererState, tab: PanelTab, label: string): string {
   const active = state.panelTab === tab;
@@ -190,15 +200,33 @@ function renderAiSection(state: RendererState): string {
         <label>语音引擎
           <select data-ai-setting="ttsEngine">
             <option value="system" ${settings.ttsEngine === 'system' ? 'selected' : ''}>系统语音（离线）</option>
+            <option value="clone" ${settings.ttsEngine === 'clone' ? 'selected' : ''}>克隆音色（GPT-SoVITS）</option>
             <option value="off" ${settings.ttsEngine === 'off' ? 'selected' : ''}>不发声</option>
           </select>
         </label>
-        <label>音色
-          <span class="ai-inline-row">
-            <input type="text" class="ai-voice-input" list="ai-voice-list" data-ai-setting="ttsVoice" value="${escapeHtml(settings.ttsVoice)}">
-            <button type="button" class="panel-link-button" data-ai-action="list-voices">读取音色</button>
-          </span>
-        </label>
+        ${
+          settings.ttsEngine === 'clone'
+            ? `<label>克隆服务地址
+                <span class="ai-inline-row">
+                  <input type="text" data-ai-setting="ttsApiUrl" value="${escapeHtml(settings.ttsApiUrl)}">
+                  <button type="button" class="panel-link-button" data-ai-action="probe-clone">检查</button>
+                </span>
+              </label>
+              <label>参考音频路径<input type="text" data-ai-setting="ttsRefAudio" placeholder="${escapeHtml(TTS_REF_AUDIO_HINT)}" value="${escapeHtml(settings.ttsRefAudio)}"></label>
+              <label>参考台词（音频里说的那句话）<input type="text" maxlength="200" data-ai-setting="ttsPromptText" value="${escapeHtml(settings.ttsPromptText)}"></label>
+              <label>参考台词语言
+                <select data-ai-setting="ttsPromptLang">${renderTtsLangOptions(settings.ttsPromptLang)}</select>
+              </label>
+              <label>朗读语言
+                <select data-ai-setting="ttsTextLang">${renderTtsLangOptions(settings.ttsTextLang)}</select>
+              </label>`
+            : `<label>音色
+                <span class="ai-inline-row">
+                  <input type="text" class="ai-voice-input" list="ai-voice-list" data-ai-setting="ttsVoice" value="${escapeHtml(settings.ttsVoice)}">
+                  <button type="button" class="panel-link-button" data-ai-action="list-voices">读取音色</button>
+                </span>
+              </label>`
+        }
         <label>人设<textarea maxlength="500" rows="4" data-ai-setting="persona">${escapeHtml(settings.persona)}</textarea></label>
       </div>
       <datalist id="ai-model-list">${modelOptions}</datalist>

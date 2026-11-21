@@ -1,7 +1,21 @@
 export type AiReplySource = 'chat' | 'desktop-observation' | 'system' | 'qq-group';
 
-/** 语音走本机 Windows SAPI（无需 Key），或彻底关闭。 */
-export type TtsEngine = 'system' | 'off';
+/**
+ * 语音引擎：system = 本机 Windows SAPI（默认音色，机械）；
+ * clone = 本机 GPT-SoVITS 克隆音色（HTTP 接口）；off = 不发声。
+ */
+export type TtsEngine = 'system' | 'off' | 'clone';
+
+/** GPT-SoVITS 支持的语言代号。 */
+export type TtsLang = 'zh' | 'en' | 'ja' | 'ko' | 'yue';
+
+export const TTS_LANG_OPTIONS: Array<{ value: TtsLang; label: string }> = [
+  { value: 'zh', label: '中文' },
+  { value: 'en', label: '英文' },
+  { value: 'ja', label: '日文' },
+  { value: 'ko', label: '韩文' },
+  { value: 'yue', label: '粤语' }
+];
 
 export interface AiSettings {
   enabled: boolean;
@@ -13,6 +27,14 @@ export interface AiSettings {
   textModel: string;
   ttsEngine: TtsEngine;
   ttsVoice: string;
+  /** 克隆音色服务的地址，默认本机 GPT-SoVITS api_v2。 */
+  ttsApiUrl: string;
+  /** 参考音频的绝对路径（3~10 秒、单声道 wav 最稳）。 */
+  ttsRefAudio: string;
+  /** 参考音频里说的那句原话，必须和音频内容一致。 */
+  ttsPromptText: string;
+  ttsPromptLang: TtsLang;
+  ttsTextLang: TtsLang;
   persona: string;
 }
 
@@ -76,6 +98,12 @@ export const AI_TEMPERATURE = 0.9;
 export const AI_MAX_TOKENS = 512;
 export const AI_REQUEST_TIMEOUT_MS = 30_000;
 export const DEFAULT_TTS_VOICE = 'Microsoft Huihui Desktop';
+/** 本机 GPT-SoVITS api_v2 的默认地址。 */
+export const DEFAULT_TTS_API_URL = 'http://127.0.0.1:9880';
+/** 克隆音色要跑一次推理，给足时间。 */
+export const TTS_CLONE_TIMEOUT_MS = 90_000;
+export const TTS_PROMPT_TEXT_LIMIT = 200;
+export const TTS_REF_AUDIO_HINT = '例如 D:\\GPT-SoVITS\\ref\\hutao-8s.wav';
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   enabled: false,
@@ -86,6 +114,11 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   textModel: 'deepseek-v4.1-flash',
   ttsEngine: 'system',
   ttsVoice: DEFAULT_TTS_VOICE,
+  ttsApiUrl: DEFAULT_TTS_API_URL,
+  ttsRefAudio: '',
+  ttsPromptText: '',
+  ttsPromptLang: 'zh',
+  ttsTextLang: 'zh',
   persona:
     '你是《原神》里的往生堂第七十七代堂主胡桃，也是这个本地桌宠里的胡桃。你古灵精怪、活泼俏皮，自称本堂主，喜欢押韵和小巷派暗黑打油诗。语气轻快、有陪伴感，可以偶尔来一句短短的打油诗，但不要阴森吓人。'
 };

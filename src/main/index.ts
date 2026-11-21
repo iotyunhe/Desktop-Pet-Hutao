@@ -8,6 +8,7 @@ import { AiService } from './services/ai/ai-service';
 import { ChatClient } from './services/ai/chat-client';
 import { DesktopObserver } from './services/ai/desktop-observer';
 import { SystemTts } from './services/ai/system-tts';
+import { CloneTtsClient } from './services/ai/clone-tts';
 import { QqService } from './services/qq/qq-service';
 import { BilibiliClient } from './services/bilibili/bilibili-client';
 import { BilibiliService } from './services/bilibili/bilibili-service';
@@ -113,12 +114,14 @@ async function bootstrap(): Promise<void> {
     baseUrl: () => aiSettings.get().apiBaseUrl
   });
   const observer = new DesktopObserver();
+  const cloneTts = new CloneTtsClient({ baseUrl: () => aiSettings.get().ttsApiUrl });
   const aiService = new AiService({
     settings: aiSettings,
     keys,
     client: chatClient,
     observer,
     tts: new SystemTts(),
+    cloneTts,
     logger
   });
 

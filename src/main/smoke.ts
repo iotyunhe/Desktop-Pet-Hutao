@@ -77,6 +77,23 @@ export async function runAiSelfCheck(ai: AiService, resultPath: string | null): 
     detail: voices.ok ? voices.voices.join(', ') : voices.error
   });
 
+  if (status.settings.ttsEngine === 'clone') {
+    const probe = await ai.probeCloneVoice();
+    checks.push({
+      name: 'clone service',
+      ok: probe.text.startsWith('克隆音色服务'),
+      detail: probe.text
+    });
+    const voice = await ai.testVoice();
+    checks.push({
+      name: 'clone voice',
+      ok: Boolean(voice.ok && voice.audioBase64),
+      detail: voice.ok
+        ? `${voice.audioMimeType ?? 'audio/wav'} · ${Math.round((voice.audioBase64?.length ?? 0) / 1024)}KB`
+        : voice.error
+    });
+  }
+
   const ok = checks.every((check) => check.ok);
   writeSmokeResult(resultPath, { ok, checks });
   return ok ? 0 : 1;

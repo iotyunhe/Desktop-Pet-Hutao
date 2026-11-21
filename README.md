@@ -80,6 +80,7 @@ npm run dist       # 打包：安装版 exe + 便携版 exe
 - **换模型**：面板里改「接口地址 / 文本模型」即可，DeepSeek、OpenAI、Kimi、GLM、本地 Ollama、LM Studio 都行；点「拉取模型」可以直接从接口读出模型列表。
 - **验证**：「测试连接」会真的发一次对话请求，显示模型、耗时和回的原话，不用等聊天时才发现配置错了。
 - **语音**：默认用 Windows 自带语音合成（System.Speech，默认音色 `Microsoft Huihui Desktop`），点「读取音色」列出本机所有音色，不需要额外 API；不想用就把语音引擎设成「关闭」。
+- **克隆音色**：想让她用某个具体的声音，可以把语音引擎切成「克隆音色（GPT-SoVITS）」，接一个本机的 GPT-SoVITS 服务（3~10 秒参考音频 + 对应台词即可）。服务常驻在本机，桌宠只发 HTTP 请求，不内嵌模型；服务没开时语音静默失败、气泡照常。完整安装步骤与踩坑清单见 [docs/voice-clone.md](docs/voice-clone.md)。
 - **低频观察**：只看当前活动应用名与窗口标题，不截图、不 OCR。
 - **Key 从哪来**：优先级为面板保存的 Key → 环境变量 `HUTAO_API_KEY` / `OPENCODE_API_KEY` / `DEEPSEEK_API_KEY`。面板保存的 Key 用 Electron `safeStorage` 加密存到 `userData/llm-api-key.bin`，不会进入仓库；环境变量的 Key 不落盘。
 - 从 0.4.x 升级：旧的 `minimax-api-key.bin` 会被自动读取并迁移到新文件；本来就在用 MiniMax 的话，把接口地址填回 `https://api.minimaxi.com/v1` 即可。
@@ -193,6 +194,7 @@ src/
       ai/
         chat-client.ts         # OpenAI 兼容 chat/completions（可注入 fetch 测试）
         system-tts.ts          # Windows 系统语音合成（System.Speech）
+        clone-tts.ts           # GPT-SoVITS 克隆音色客户端（本机 HTTP）
         ai-service.ts          # 对话/观察/试音/模型列表/连通性测试/B 站推荐语
         desktop-observer.ts    # active-win 低频观察与去重
       qq/
@@ -272,7 +274,7 @@ python scripts/process-action-sprites.py
 | --- | --- |
 | `userData/settings.json` | 窗口位置、缩放、置顶、漫步、开机自启 |
 | `userData/profile.json` | 亲密度、等级、背包、每日补给、解锁奖励 |
-| `userData/ai-settings.json` | 模型接口地址、模型名、语音引擎与音色、人设、观察间隔 |
+| `userData/ai-settings.json` | 模型接口地址、模型名、语音引擎与音色、克隆音色配置、人设、观察间隔 |
 | `userData/llm-api-key.bin` | `safeStorage` 加密后的模型 API Key |
 | `userData/qq-settings.json` | QQ 板块开关、端口、token、小号、群白名单、管理员 QQ、说话概率与频率 |
 | `userData/access-settings.json` | 本机权限策略（开关、只读目录、打开白名单、上限、工作台端口与 token） |
@@ -293,7 +295,7 @@ python scripts/process-action-sprites.py
 - 仅针对 Windows x64 打包；代码保留 macOS/Linux 的 Electron 兼容路径，但未验证。
 - 安装包未做代码签名，首次运行可能触发 SmartScreen。
 - QQ 板块依赖第三方协议端（SnowLuma / NapCat），**违反 QQ 用户协议、有封号风险**；只用小号，且协议端版本要跟着 QQ 更新。
-- 语音走 Windows 系统合成，音色取决于本机已安装的 SAPI 音色；非 Windows 平台该功能自动不可用。
+- 系统语音走 Windows 合成，音色取决于本机已安装的 SAPI 音色；克隆音色需要自己另装 GPT-SoVITS 服务（约 2GB 磁盘 + 显卡），服务没开时只出气泡不出声。
 - 本机权限没有沙箱隔离：命令以当前用户身份执行，所以「允许」之前请自己看一眼命令内容；工作台只监听 `127.0.0.1`，token 泄露等于把面板交出去，请勿外传截图中的地址。
 
 ## 参与贡献

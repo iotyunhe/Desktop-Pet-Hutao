@@ -1,4 +1,4 @@
-import { AI_MAX_TOKENS, AI_REPLY_TEXT_LIMIT, type AiConnectionTest, type AiMessageRequest, type AiModelList, type AiReply, type AiSettingsPatch, type AiStatus } from '../../../shared/ai';
+import { AI_MAX_TOKENS, AI_REPLY_TEXT_LIMIT, type AiConnectionTest, type AiMessageRequest, type AiModelList, type AiReply, type AiSettings, type AiSettingsPatch, type AiStatus } from '../../../shared/ai';
 import type { BilibiliVideo } from '../../../shared/bilibili';
 import type { AiSettingsStore, LlmKeyStore } from '../../storage/ai-store';
 import type { Logger } from '../../util/logger';
@@ -6,6 +6,7 @@ import type { AiToolDefinition, ToolExecOutcome } from '../access/ai-tools';
 import { ChatClient, limitReplyText, type ChatMessage, type ChatToolCall } from './chat-client';
 import { DesktopObserver } from './desktop-observer';
 import { SystemTts, type TtsVoiceList } from './system-tts';
+import type { CloneTtsClient } from './clone-tts';
 import { runToolLoop } from './tool-loop';
 
 export interface AiServiceOptions {
@@ -14,6 +15,7 @@ export interface AiServiceOptions {
   client: ChatClient;
   observer: DesktopObserver;
   tts: SystemTts;
+  cloneTts: CloneTtsClient;
   logger: Logger;
 }
 
@@ -233,25 +235,44 @@ export class AiService {
       return this.systemReply('AI 互动还没开启，先打开开关再试音吧。');
     }
 
-    if (settings.ttsEngine !== 'system') {
+    if (settings.ttsEngine === 'off') {
       return this.systemReply('语音播报现在是关闭的，先在配置里打开。');
     }
 
+    const usingClone = settings.ttsEngine === 'clone';
     try {
-      const audio = await this.options.tts.speak(VOICE_TEST_TEXT, settings.ttsVoice);
+      const audio = await this.speakWithSettings(VOICE_TEST_TEXT, settings);
       this.lastError = null;
+      const voiceLabel = usingClone ? `克隆音色（${settings.ttsApiUrl}）` : settings.ttsVoice;
       return {
         ok: true,
         source: 'system',
-        text: `语音测试成功，当前音色：${audio.voice}。`,
+        text: `语音测试成功，当前音色：${voiceLabel}。`,
         audioBase64: audio.audioBase64,
         audioMimeType: audio.mimeType
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : '语音测试失败。';
-      this.options.logger.warn('系统语音测试失败', message);
+      this.options.logger.warn(`${usingClone ? '克隆音色' : '系统语音'}测试失败`, message);
       return this.systemReply(`语音测试失败：${message}`, message);
     }
+  }
+
+  /** 只探一下克隆音色服务在不在，不出声。 */
+  async probeCloneVoice(): Promise<AiReply> {
+    const settings = this.options.settings.get();
+    if (settings.ttsEngine !== 'clone') {
+      return this.systemReply(`当前用的是${settings.ttsEngine === 'off' ? '关闭语音' : '系统语音'}，先把引擎切到「克隆音色」。`);
+    }
+    const result = await this.options.cloneTts.probe();
+    if (!result.ok) {
+      return this.systemReply(`连接失败：${result.error ?? '未知原因'}`, result.error);
+    }
+    return {
+      ok: true,
+      source: 'system',
+      text: `克隆音色服务在线：${settings.ttsApiUrl}`
+    };
   }
 
   /**
@@ -378,7 +399,7 @@ export class AiService {
     }
 
     try {
-      const audio = await this.options.tts.speak(reply.text, settings.ttsVoice);
+      const audio = await this.speakWithSettings(reply.text, settings);
       return {
         ...reply,
         audioBase64: audio.audioBase64,
@@ -386,8 +407,26 @@ export class AiService {
       };
     } catch (error) {
       this.lastError = error instanceof Error ? `语音生成失败：${error.message}` : '语音生成失败。';
+      this.options.logger.warn('语音生成失败', this.lastError);
       return reply;
     }
+  }
+
+  /** 按当前引擎出声：clone 走本机 GPT-SoVITS，system 走 Windows SAPI。 */
+  private async speakWithSettings(
+    text: string,
+    settings: AiSettings
+  ): Promise<{ audioBase64: string; mimeType: string }> {
+    if (settings.ttsEngine === 'clone') {
+      return this.options.cloneTts.speak({
+        text,
+        refAudioPath: settings.ttsRefAudio,
+        promptText: settings.ttsPromptText,
+        promptLang: settings.ttsPromptLang,
+        textLang: settings.ttsTextLang
+      });
+    }
+    return this.options.tts.speak(text, settings.ttsVoice);
   }
 
   private systemReply(text: string, error?: string): AiReply {

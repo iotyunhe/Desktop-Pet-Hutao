@@ -2,6 +2,21 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)。
 
+## [0.7.0] - 2026-11-21
+
+### Added
+
+- **克隆音色**：语音引擎新增第三种 `clone`，把一段 3~10 秒的参考音频交给本机 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) 服务，让她用那个声音念台词。桌宠只发 HTTP 请求（默认 `http://127.0.0.1:9880`），不内嵌模型、不增加安装包体积；服务没开时语音静默失败，气泡照常。
+- 面板「AI → 偏好设置」新增：克隆服务地址 + 「检查」、参考音频路径、参考台词、参考台词语言、朗读语言。
+- `CloneTtsClient`（`src/main/services/ai/clone-tts.ts`）：`POST /tts`（`text_split_method=cut5`、`repetition_penalty=1.35`、`media_type=wav`），90 秒超时，错误文案区分「服务没开 / 返回空音频 / 没填参考音频」。
+- `npm run smoke:ai` 在克隆引擎下会额外检查「服务在线」并真的合成一段音频。
+- 新增文档 `docs/voice-clone.md`：从零装 GPT-SoVITS（镜像源、torch cu121、依赖踩坑表）、准备参考音频、转写、启动服务、面板配置、性能与排障。
+
+### Changed
+
+- `AiSettings` 新增 `ttsApiUrl` / `ttsRefAudio` / `ttsPromptText` / `ttsPromptLang` / `ttsTextLang`，`TtsEngine` 扩展为 `system | off | clone`。
+- 试音与自动朗读统一走 `speakWithSettings`，两种引擎共用同一套失败降级逻辑；失败原因写进 `lastError` 与日志。
+
 ## [0.6.0] - 2026-11-21
 
 ### Added

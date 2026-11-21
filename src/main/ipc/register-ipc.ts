@@ -88,6 +88,8 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 
   ipcMain.handle(IPC.aiListVoices, () => deps.ai.listVoices());
 
+  ipcMain.handle(IPC.aiProbeCloneVoice, () => deps.ai.probeCloneVoice());
+
   ipcMain.handle(IPC.qqGetStatus, () => deps.qq.getStatus());
 
   ipcMain.handle(IPC.qqUpdateSettings, (_event, patch: QqSettingsPatch) => {

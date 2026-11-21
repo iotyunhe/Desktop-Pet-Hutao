@@ -51,6 +51,7 @@ export const IPC = {
   aiTestConnection: 'ai:test-connection',
   aiListModels: 'ai:list-models',
   aiListVoices: 'ai:list-voices',
+  aiProbeCloneVoice: 'ai:probe-clone-voice',
 
   qqGetStatus: 'qq:get-status',
   qqUpdateSettings: 'qq:update-settings',
@@ -126,6 +127,7 @@ export interface HuTaoPetApi {
   testAiConnection: () => Promise<AiConnectionTest>;
   listAiModels: () => Promise<AiModelList>;
   listAiVoices: () => Promise<TtsVoiceListResult>;
+  probeCloneVoice: () => Promise<AiReply>;
 
   getQqStatus: () => Promise<QqStatus>;
   updateQqSettings: (patch: QqSettingsPatch) => Promise<QqStatus>;
