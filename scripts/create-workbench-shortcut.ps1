@@ -1,4 +1,4 @@
-# 在桌面创建一个「胡桃工作台」快捷方式
+﻿# 在桌面创建一个「胡桃工作台」快捷方式
 #
 # 用法：
 #   powershell -ExecutionPolicy Bypass -File scripts\create-workbench-shortcut.ps1
@@ -14,6 +14,23 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Find-PetExe {
+    $shell = New-Object -ComObject WScript.Shell
+
+    # 先看安装器建的桌面/开始菜单快捷方式，能适配「装到别的盘」的情况。
+    $shortcutCandidates = @(
+        (Join-Path ([Environment]::GetFolderPath('Desktop')) '胡桃桌宠.lnk'),
+        (Join-Path ([Environment]::GetFolderPath('Programs')) '胡桃桌宠.lnk')
+    )
+
+    foreach ($link in $shortcutCandidates) {
+        if (Test-Path -LiteralPath $link) {
+            $target = $shell.CreateShortcut($link).TargetPath
+            if ($target -and (Test-Path -LiteralPath $target)) {
+                return $target
+            }
+        }
+    }
+
     $candidates = @(
         (Join-Path $env:LOCALAPPDATA 'Programs\hutao-desktop-pet\胡桃桌宠.exe'),
         (Join-Path $env:ProgramFiles '胡桃桌宠\胡桃桌宠.exe'),
