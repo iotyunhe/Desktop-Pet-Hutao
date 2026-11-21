@@ -29,6 +29,29 @@ test('normalizeAiSettings 把 MiniMax 时代的字段迁移成系统语音', () 
   assert.equal(migrated.ttsEngine, 'system');
   assert.equal(migrated.ttsVoice, DEFAULT_TTS_VOICE);
   assert.equal(migrated.enabled, true);
+  // 旧的 MiniMax 模型名在新网关上不存在，迁移时换成默认模型。
+  assert.equal(migrated.textModel, DEFAULT_AI_SETTINGS.textModel);
+});
+
+test('normalizeAiSettings 不覆盖用户自己填的第三方模型名', () => {
+  const settings = normalizeAiSettings({
+    apiBaseUrl: 'https://api.deepseek.com/v1',
+    textModel: 'deepseek-chat'
+  });
+
+  assert.equal(settings.apiBaseUrl, 'https://api.deepseek.com/v1');
+  assert.equal(settings.textModel, 'deepseek-chat');
+});
+
+test('normalizeAiSettings 对已经迁移过接口地址的存档仍然替换旧模型名', () => {
+  // 上一次启动已经把接口地址换成默认网关，但模型名还留着 MiniMax 的，
+  // 这种情况也要自愈，否则每次请求都会 400。
+  const settings = normalizeAiSettings({
+    apiBaseUrl: DEFAULT_AI_SETTINGS.apiBaseUrl,
+    textModel: 'MiniMax-M2.7'
+  });
+
+  assert.equal(settings.textModel, DEFAULT_AI_SETTINGS.textModel);
 });
 
 test('normalizeAiSettings 夹紧观察间隔并只接受已知语音引擎', () => {

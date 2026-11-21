@@ -23,6 +23,7 @@ const capturePath =
       ? resolve(argv[captureFlag + 1] ?? '')
       : null;
 const bilibiliSmoke = argv.includes('--bilibili');
+const aiSmoke = argv.includes('--ai');
 const resultPath = join(tmpdir(), `hutao-smoke-${process.pid}-${Date.now()}.json`);
 
 if (packagedExe && !existsSync(packagedExe)) {
@@ -31,7 +32,7 @@ if (packagedExe && !existsSync(packagedExe)) {
 }
 
 const exePath = packagedExe ?? join(root, 'node_modules', 'electron', 'dist', 'electron.exe');
-const modeFlag = bilibiliSmoke ? '--bilibili-smoke' : '--smoke-test';
+const modeFlag = aiSmoke ? '--ai-smoke' : bilibiliSmoke ? '--bilibili-smoke' : '--smoke-test';
 const args = packagedExe ? [modeFlag] : [root, modeFlag];
 
 args.push(`--smoke-result=${resultPath}`);

@@ -13,7 +13,19 @@ import { BilibiliClient } from './services/bilibili/bilibili-client';
 import { BilibiliService } from './services/bilibili/bilibili-service';
 import { ContentCurator } from './services/bilibili/content-curator';
 import { CareService } from './services/care-service';
-import { runWindowSmokeTest, runLongPressProbe, runPanelLifecycleProbe, runQqGatewayProbe, runShareCardProbe, captureMoodToFile, captureWindowToFile, openCarePanelForCapture, writeSmokeResult, type SmokeCheck } from './smoke';
+import {
+  captureMoodToFile,
+  captureWindowToFile,
+  openCarePanelForCapture,
+  runAiSelfCheck,
+  runLongPressProbe,
+  runPanelLifecycleProbe,
+  runQqGatewayProbe,
+  runShareCardProbe,
+  runWindowSmokeTest,
+  writeSmokeResult,
+  type SmokeCheck
+} from './smoke';
 import { AiSettingsStore, LlmKeyStore } from './storage/ai-store';
 import { BilibiliHistoryStore, BilibiliSettingsStore } from './storage/bilibili-store';
 import { CareProfileStore } from './storage/profile-store';
@@ -27,6 +39,8 @@ import { resolveAppIconPath, resolveTrayIconPath } from './window/assets';
 const argv = process.argv;
 const smokeTest = argv.includes('--smoke-test');
 const bilibiliSmoke = argv.includes('--bilibili-smoke');
+// AI 自检要用真实存档（要读已存的 API Key），所以不重定向 userData。
+const aiSmoke = argv.includes('--ai-smoke');
 const isSmokeRun = smokeTest || bilibiliSmoke;
 const smokeResultArg = argv.find((arg) => arg.startsWith('--smoke-result='));
 const smokeResultPath = smokeResultArg ? smokeResultArg.slice('--smoke-result='.length) : null;
@@ -101,6 +115,12 @@ async function bootstrap(): Promise<void> {
     tts: new SystemTts(),
     logger
   });
+
+  if (aiSmoke) {
+    const exitCode = await runAiSelfCheck(aiService, smokeResultPath);
+    app.exit(exitCode);
+    return;
+  }
   const qqService = new QqService({
     settings: qqSettings,
     ai: aiService,
@@ -274,7 +294,7 @@ async function bootstrap(): Promise<void> {
   });
 }
 
-if (!isSmokeRun) {
+if (!isSmokeRun && !aiSmoke) {
   const hasLock = app.requestSingleInstanceLock();
 
   if (!hasLock) {

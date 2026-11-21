@@ -37,8 +37,8 @@ npm run dist       # 打包：安装版 exe + 便携版 exe
 
 构建产物在 `release/`：
 
-- `HuTao-Desktop-Pet-Setup-0.5.0-x64.exe`：NSIS 安装包。
-- `HuTao-Desktop-Pet-0.5.0-portable.exe`：免安装便携版。
+- `HuTao-Desktop-Pet-Setup-0.5.1-x64.exe`：NSIS 安装包。
+- `HuTao-Desktop-Pet-0.5.1-portable.exe`：免安装便携版。
 - `win-unpacked/胡桃桌宠.exe`：未压缩目录版，方便调试。
 
 > 打包会写入应用图标与版本信息，electron-builder 首次需要下载 `winCodeSign`。如果它在无管理员权限的机器上解压失败，可用管理员权限运行一次，或把 `winCodeSign-2.6.0.7z` 解压到 `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign\winCodeSign-2.6.0` 后重试（只需 Windows 部分，darwin 软链接报错可以忽略）。安装包没有代码签名，首次运行可能触发 SmartScreen，选择「仍要运行」即可。
@@ -214,6 +214,7 @@ npm run build      # typecheck + 生产构建到 out/
 npm run dist       # 构建并打包 NSIS 安装版 + portable 便携版
 npm run smoke      # 用仓库内 Electron 跑窗口冒烟测试（含长按回归）
 npm run smoke -- --bilibili                                    # 额外抓一条 B 站视频验证网络
+npm run smoke:ai                                               # 用真实存档里的 Key 打一次模型接口，验证「配上没有」
 node scripts/run-smoke.cjs --capture tmp/care.png --capture-tab=care
 node scripts/run-smoke.cjs --capture tmp/ai.png --capture-tab=ai
 node scripts/run-smoke.cjs --capture tmp/qq.png --capture-tab=qq
@@ -222,7 +223,9 @@ node scripts/run-smoke.cjs --exe "release/win-unpacked/胡桃桌宠.exe"  # 验�
 powershell -ExecutionPolicy Bypass -File scripts\qq-setup.ps1 -Uin <小号QQ> -SnowLumaDir 'D:\SnowLuma'
 ```
 
-冒烟测试会使用临时 `userData`，不会污染真实存档；结果写入 `--smoke-result` 指定的 JSON 并打印到终端。检查项包括：窗口创建、renderer 挂载、preload 桥接、透明背景、B 站 IPC、存档落盘、托盘/应用图标、长按窗口尺寸与气泡收起。
+冒烟测试会使用临时 `userData`，不会污染真实存档；结果写入 `--smoke-result` 指定的 JSON 并打印到终端。检查项包括：窗口创建、renderer 挂载、preload 桥接、透明背景、B 站 IPC、QQ 网关与群事件、存档落盘、托盘/应用图标、长按窗口尺寸与气泡收起。
+
+`npm run smoke:ai` 是例外：它要读真实存档里的 API Key，所以不重定向 `userData`，也不占用单实例锁，会打印接口地址、模型名、Key 来源、真实回复与耗时、本机音色列表。
 
 图标和动作素材可以重新生成（需要 Pillow）：
 

@@ -1,4 +1,4 @@
-import { AI_REPLY_TEXT_LIMIT, type AiConnectionTest, type AiMessageRequest, type AiModelList, type AiReply, type AiSettingsPatch, type AiStatus } from '../../../shared/ai';
+import { AI_MAX_TOKENS, AI_REPLY_TEXT_LIMIT, type AiConnectionTest, type AiMessageRequest, type AiModelList, type AiReply, type AiSettingsPatch, type AiStatus } from '../../../shared/ai';
 import type { BilibiliVideo } from '../../../shared/bilibili';
 import type { AiSettingsStore, LlmKeyStore } from '../../storage/ai-store';
 import type { Logger } from '../../util/logger';
@@ -112,7 +112,8 @@ export class AiService {
         system: '你是一个接入测试助手，只回一句话。',
         user: CONNECTION_TEST_PROMPT,
         temperature: 0.6,
-        maxTokens: 160
+        // 推理模型的思考过程也算进 max_tokens，给少了会只拿到空回复。
+        maxTokens: AI_MAX_TOKENS
       });
 
       this.lastError = null;

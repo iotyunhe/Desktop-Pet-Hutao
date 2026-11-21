@@ -163,13 +163,24 @@ export function normalizeAiSettings(value: unknown): AiSettings {
     )
   );
 
+  const apiBaseUrl = normalizeApiBaseUrl(merged.apiBaseUrl);
+  // 从 MiniMax 版本升级上来时，接口地址会回落到默认网关，
+  // 但旧的 MiniMax 模型名在新网关上并不存在，这里一并换掉。
+  const rawModel = normalizeShortText(merged.textModel, DEFAULT_AI_SETTINGS.textModel, 80);
+  // 从 MiniMax 版本升级上来时，接口地址会回落到默认网关，
+  // 但旧的 MiniMax 模型名在新网关上并不存在，这里一并换掉。
+  // 只看「模型名像 MiniMax 而接口不是 MiniMax」，这样重复启动也能自愈。
+  const endpointIsMinimax = /minimax/i.test(apiBaseUrl);
+  const legacyModelName = /^(minimax|abab)/i.test(rawModel);
+  const textModel = !endpointIsMinimax && legacyModelName ? DEFAULT_AI_SETTINGS.textModel : rawModel;
+
   return {
     enabled: Boolean(merged.enabled),
     autoObserveEnabled: Boolean(merged.autoObserveEnabled),
     observeIntervalMinutes,
     voiceEnabled: Boolean(merged.voiceEnabled),
-    apiBaseUrl: normalizeApiBaseUrl(merged.apiBaseUrl),
-    textModel: normalizeShortText(merged.textModel, DEFAULT_AI_SETTINGS.textModel, 80),
+    apiBaseUrl,
+    textModel,
     ttsEngine: normalizeTtsEngine(merged.ttsEngine),
     ttsVoice: normalizeShortText(merged.ttsVoice, DEFAULT_TTS_VOICE, 80),
     persona: normalizePersona(merged.persona)

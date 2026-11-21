@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import WebSocket from 'ws';
 import { IPC, type BilibiliShare } from '../shared';
+import type { AiService } from './services/ai/ai-service';
 import { OneBotGateway } from './services/qq/onebot-gateway';
 import { noopLogger } from './util/logger';
 
@@ -39,6 +40,46 @@ export function writeSmokeResult(resultPath: string | null, result: Omit<SmokeRe
 
 async function evaluate(window: BrowserWindow, expression: string): Promise<unknown> {
   return window.webContents.executeJavaScript(expression, true);
+}
+
+/**
+ * 大模型自检（`--ai-smoke`）：用真实存档里的 Key 真的打一次接口，
+ * 再读一次本机语音。用来给用户确认「配上模型」到底通没通。
+ */
+export async function runAiSelfCheck(ai: AiService, resultPath: string | null): Promise<number> {
+  const checks: SmokeCheck[] = [];
+  const status = ai.getStatus();
+
+  checks.push({
+    name: 'ai settings',
+    ok: /^https?:\/\//.test(status.settings.apiBaseUrl),
+    detail: `${status.settings.apiBaseUrl} · ${status.settings.textModel}`
+  });
+  checks.push({
+    name: 'ai api key',
+    ok: status.hasApiKey,
+    detail: `source=${status.keySource ?? 'none'}`
+  });
+
+  const connection = await ai.testConnection();
+  checks.push({
+    name: 'ai connection',
+    ok: connection.ok,
+    detail: connection.ok
+      ? `${connection.model} · ${connection.latencyMs}ms · ${connection.reply}`
+      : connection.error
+  });
+
+  const voices = await ai.listVoices();
+  checks.push({
+    name: 'system voices',
+    ok: voices.ok && voices.voices.length > 0,
+    detail: voices.ok ? voices.voices.join(', ') : voices.error
+  });
+
+  const ok = checks.every((check) => check.ok);
+  writeSmokeResult(resultPath, { ok, checks });
+  return ok ? 0 : 1;
 }
 
 /**

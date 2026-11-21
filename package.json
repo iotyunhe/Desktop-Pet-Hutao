@@ -1,6 +1,6 @@
 {
   "name": "hutao-desktop-pet",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "A 2D Hu Tao desktop pet built with Electron, now with a Bilibili wandering companion.",
   "type": "module",
@@ -12,7 +12,8 @@
     "preview": "node scripts/run-electron-vite.cjs preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "node scripts/run-tests.mjs",
-    "smoke": "node scripts/run-smoke.cjs"
+    "smoke": "node scripts/run-smoke.cjs",
+    "smoke:ai": "node scripts/run-smoke.cjs --ai"
   },
   "keywords": [
     "electron",
